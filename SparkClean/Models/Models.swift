@@ -128,6 +128,12 @@ struct CleanupCategory: Identifiable, Equatable {
     let group: CategoryGroup
     let safetyLevel: SafetyLevel
     var paths: [String]
+    /// The subtree(s) this category is allowed to delete within. Deletion is confined
+    /// to paths equal to or under one of these roots (in addition to the global
+    /// `DeletionPolicy` rules). Empty means "derive from `paths`" — see
+    /// `DeletionPolicy.validate`. This bounds a category to its declared territory so a
+    /// scan bug can never delete outside it.
+    var allowedRoots: [String] = []
     var breakdown: [PathStat] = []
     var deleteChildrenOnly: Bool = true
     var isDockerResource: Bool = false
@@ -206,6 +212,8 @@ enum SidebarItem: Hashable {
     case duplicateFinder
     case maintenance
     case startupManager
+    case timeMachine
+    case storageInsights
 }
 
 // MARK: - App Info (Uninstaller)

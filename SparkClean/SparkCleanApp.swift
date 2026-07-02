@@ -16,37 +16,16 @@ struct SparkCleanApp: App {
     @State private var showUpdateSheet = false
     @AppStorage("trashMonitorEnabled") private var trashMonitorEnabled = false
     @AppStorage("checkUpdatesOnLaunch") private var checkUpdatesOnLaunch = false
+    @AppStorage("showMenuBarExtra") private var showMenuBarExtra = false
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(trashMonitor)
-                .frame(minWidth: 800, minHeight: 550)
-                .sheet(isPresented: $showCustomAbout) {
-                    CustomAboutView()
-                }
-                .onAppear {
-                    if trashMonitorEnabled {
-                        trashMonitor.isEnabled = true
-                    }
-                    if checkUpdatesOnLaunch {
-                        Task {
-                            await updateChecker.check()
-                            if updateChecker.updateAvailable {
-                                showUpdateSheet = true
-                            }
-                        }
-                    }
-                }
-                .onChange(of: trashMonitorEnabled) { _, newValue in
-                    trashMonitor.isEnabled = newValue
-                }
-                .sheet(item: $trashMonitor.lastDetectedApp) { detected in
-                    TrashLeftoverSheet(detected: detected, trashMonitor: trashMonitor)
-                }
-                .sheet(isPresented: $showUpdateSheet) {
-                    UpdateCheckSheet(updateChecker: updateChecker)
-                }
+            RootWindowView(
+                trashMonitor: trashMonitor,
+                updateChecker: updateChecker,
+                showCustomAbout: $showCustomAbout,
+                showUpdateSheet: $showUpdateSheet
+            )
         }
         .defaultSize(width: 960, height: 680)
         .windowResizability(.contentSize)
@@ -69,6 +48,11 @@ struct SparkCleanApp: App {
                     NotificationCenter.default.post(name: .exportReport, object: nil)
                 }
                 .keyboardShortcut("e", modifiers: [.command])
+
+                Button("Restore Last Cleanup") {
+                    NotificationCenter.default.post(name: .restoreLastCleanup, object: nil)
+                }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
             }
 
             // Selection menu
@@ -141,6 +125,77 @@ struct SparkCleanApp: App {
         Settings {
             SettingsView()
         }
+
+        // Optional menu bar presence (F12) — off by default.
+        MenuBarExtra(isInserted: $showMenuBarExtra) {
+            MenuBarContent()
+        } label: {
+            Image(systemName: "sparkles")
+        }
+    }
+}
+
+// MARK: - Root Window (extracted to keep the App scene body simple)
+
+struct RootWindowView: View {
+    @Bindable var trashMonitor: TrashMonitor
+    @Bindable var updateChecker: UpdateChecker
+    @Binding var showCustomAbout: Bool
+    @Binding var showUpdateSheet: Bool
+    @AppStorage("trashMonitorEnabled") private var trashMonitorEnabled = false
+    @AppStorage("checkUpdatesOnLaunch") private var checkUpdatesOnLaunch = false
+
+    var body: some View {
+        ContentView()
+            .environment(trashMonitor)
+            .frame(minWidth: 800, minHeight: 550)
+            .sheet(isPresented: $showCustomAbout) {
+                CustomAboutView()
+            }
+            .onAppear {
+                if trashMonitorEnabled {
+                    trashMonitor.isEnabled = true
+                }
+                if checkUpdatesOnLaunch {
+                    Task {
+                        await updateChecker.check()
+                        if updateChecker.updateAvailable {
+                            showUpdateSheet = true
+                        }
+                    }
+                }
+            }
+            .onChange(of: trashMonitorEnabled) { _, newValue in
+                trashMonitor.isEnabled = newValue
+            }
+            .sheet(item: $trashMonitor.lastDetectedApp) { detected in
+                TrashLeftoverSheet(detected: detected, trashMonitor: trashMonitor)
+            }
+            .sheet(isPresented: $showUpdateSheet) {
+                UpdateCheckSheet(updateChecker: updateChecker)
+            }
+    }
+}
+
+// MARK: - Menu Bar Content (F12)
+
+struct MenuBarContent: View {
+    var body: some View {
+        Button("Open SparkClean") {
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.windows.first?.makeKeyAndOrderFront(nil)
+        }
+        Button("Scan Now") {
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.windows.first?.makeKeyAndOrderFront(nil)
+            NotificationCenter.default.post(name: .startScan, object: nil)
+        }
+        Divider()
+        Button("Open Trash") {
+            NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.Trash"))
+        }
+        Divider()
+        Button("Quit SparkClean") { NSApp.terminate(nil) }
     }
 }
 
@@ -316,6 +371,7 @@ extension Notification.Name {
     static let deselectAll = Notification.Name("deselectAll")
     static let selectSafeOnly = Notification.Name("selectSafeOnly")
     static let exportReport = Notification.Name("exportReport")
+    static let restoreLastCleanup = Notification.Name("restoreLastCleanup")
     static let showHelp = Notification.Name("showHelp")
     static let showPrivacyPolicy = Notification.Name("showPrivacyPolicy")
     static let showWhatsNew = Notification.Name("showWhatsNew")

@@ -4,6 +4,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 
 ## [Unreleased]
 
+### Added
+- **feature**: **Time Machine** sidebar section — lists APFS local snapshots (which macOS thins only lazily, leaving tens of GB of "purgeable" space), with safe multi-select deletion via `tmutil` (admin-escalated, injection-guarded). The newest snapshot is kept as a restore point.
+- **feature**: **Storage Insights** sidebar section — a read-only view of stores that grow silently but usually shouldn't be bulk-deleted (WhatsApp/Telegram/WeChat/Signal/Messages, iOS backups, Photos, Mail, Downloads, Docker). Shows current size, month-over-month growth trend, and a Full-Disk-Access badge when a store is unreadable. Deletes nothing; keeps up to a year of daily size history.
+- **feature**: Optional **menu bar icon** (Settings → General) with Open / Scan Now / Open Trash quick actions.
+- **scan**: App/media/cloud cache coverage — WeChat, OneDrive, Dropbox, Steam shader cache, Apple Music artwork (safe), and Podcasts cache (review). Plus a "Shared Container Caches" sweep covering every sandboxed app's Group-Container cache.
+- **scan**: Developer-tool cache coverage — new scans for browser-automation binaries (Playwright/Cypress/Puppeteer), uv/pre-commit, compiler caches (ccache/sccache/zig), JS build caches (Turborepo/Nx), IaC & cloud CLI caches (Terraform/Helm/kube/AWS/gcloud), and (review-level, off by default) ML framework caches and Colima/Lima/minikube VM data.
+- **scan**: Per-category **Scan** button — each category group can now be rescanned individually without a full scan, preserving every other group's results and selections (#8).
+- **scan**: Rust `target/` build-directory scan — finds `target/` dirs next to a `Cargo.toml` (Maven and other coincidental `target/` dirs are excluded), regenerable via `cargo build`. New "Scan Rust target directories" setting (#3 remainder).
+- **safety/undo**: **Restore Last Cleanup** (⇧⌘Z, File menu) — every cleanup, uninstall, and duplicate removal now records the Trash location of each item it removes, so the whole operation can be reversed. Restores skip items whose original location is re-occupied and tolerate items that have left the Trash.
+- **safety**: `FileRemover` — one deletion service now shared by the main clean pipeline, the Uninstaller, and the Duplicate Finder. Previously the Uninstaller used weaker checks and the Duplicate Finder did no safety validation at all; all three now pass the same `DeletionPolicy` gate, capture undo records, and log to the audit trail.
+- **safety**: Uninstaller gains a dedicated policy profile that permits removing whole `.app` bundles (never their interior) while keeping every other protection.
+
+### Fixed
+- **cleanup**: Broken-symlink scan no longer stalls on "Scanning broken symlinks…" (#9). The walk now checks for cancellation on every iteration (Cancel responds immediately), skips cloud-storage file-provider trees (CloudStorage, Mobile Documents, Photos, and other heavy provider dirs) that could hang enumeration, caps `~/Library` traversal depth, and bails out via an iteration watchdog. Partial results found before an interruption are still surfaced.
+
+### Added
+- **tests**: `BrokenSymlinkScanTests` covering broken/valid detection, excluded-dir skipping, cancellation, depth cap, and the iteration watchdog against isolated fixture trees.
+- **safety**: `DeletionPolicy` — a single, testable set of rules deciding whether any path may be deleted, extracted from the former inline `isSafePath`. Now also rejects iCloud Drive / cloud-storage mounts (`~/Library/CloudStorage`, `~/Library/Mobile Documents`), the contents of signed `.app`/`.framework` bundles, library document bundles (`.photoslibrary`, `.musiclibrary`, `.fcpbundle`, `.logicx`, `.sparsebundle`, keychains), and launch-service directories (`LaunchDaemons`/`LaunchAgents`/`Extensions`). Home-injectable for testing.
+- **safety**: `allowedRoots` deletion territory — each scan category now confines deletion to the subtree(s) it legitimately owns. Every concrete deletion, including children discovered at delete time, must resolve to a path within that territory, so a scan bug or a symlink escaping into a sibling tree can no longer delete outside the category's declared paths.
+- **safety**: Delete-time guard skips any item that has become an iCloud/file-provider materialization since it was scanned (prevents corrupting cloud sync state).
+- **ci**: `Tests` GitHub Actions workflow running the unit suite on every push/PR to main.
+- **tests**: `DeletionPolicyTests` — 23 characterization/expansion/territory tests pinning the exact deletable/undeletable verdicts, including component-boundary matching (`/a/bc` is not within `/a/b`), a regression guard that Ruby's `~/.bundle/cache` stays deletable, and real-symlink escape tests (into a protected dir, and out of a category's territory).
+
+### Changed
+- **safety**: `CleanupManager.isSafePath` now delegates to the shared `DeletionPolicy` (no behavior change to existing deletions; groundwork for unifying the Uninstaller and Duplicate Finder deletion paths onto the same rules).
+
+### Fixed
+- **tests**: Repaired the unit-test target, which did not compile on `main` — a stale `PathStat.id.uuidString` reference (id is now a `String`), plus drifted assertions in `CategoryGroupTests.allCasesExist` (6→9 groups) and `exportReport` (group headers are uppercased).
+
 ## [1.3.0] - 2026-04-02
 
 ### Added

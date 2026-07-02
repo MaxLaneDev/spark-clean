@@ -45,13 +45,24 @@ struct CategoryGroupDetailView: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    Button("Select All") { manager.selectAll(in: group) }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                    Button {
+                        Task { await manager.scan(onlyGroup: group) }
+                    } label: {
+                        Label("Scan", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(manager.isScanning)
 
-                    Button("Deselect All") { manager.deselectAll(in: group) }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                    if !groupCategories.isEmpty {
+                        Button("Select All") { manager.selectAll(in: group) }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                        Button("Deselect All") { manager.deselectAll(in: group) }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
                 }
             }
             .padding(.horizontal, 24)

@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.1.app || sudo xcode-select -s /Applications/Xcode_16.0.app || sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project SparkClean.xcodeproj \
+            -scheme SparkClean \
+            -destination 'platform=macOS' \
+            -only-testing:SparkCleanTests

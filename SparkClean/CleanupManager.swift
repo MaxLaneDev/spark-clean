@@ -105,43 +105,41 @@ class CleanupManager {
 
     // MARK: - Protected Paths (NEVER delete these)
 
-    /// Paths that must never be deleted — defense-in-depth against scan bugs
-    private static let protectedPaths: Set<String> = {
-        let h = NSHomeDirectory()
-        return [
-            "/", "/System", "/usr", "/bin", "/sbin", "/var", "/etc", "/tmp", "/private",
-            "/Applications", "/Library", "/Users",
-            h,
-            "\(h)/Desktop", "\(h)/Documents", "\(h)/Downloads",
-            "\(h)/Pictures", "\(h)/Movies", "\(h)/Music",
-            "\(h)/Library", "\(h)/Library/Keychains",
-            "\(h)/Library/Safari",
-            "\(h)/Library/Mail", "\(h)/Library/Preferences",
-            "\(h)/Library/Application Support",
-            "\(h)/Library/Accounts", "\(h)/Library/Cookies",
-            "\(h)/Library/Containers", "\(h)/Library/Group Containers",
-            "\(h)/.ssh", "\(h)/.gnupg",
-        ]
-    }()
+    /// Shared deletion-safety rules. All deletion surfaces validate through this.
+    static let deletionPolicy = DeletionPolicy()
 
-    /// Prefixes that are always off-limits
-    private static let forbiddenPrefixes: [String] = [
-        "/System/", "/usr/", "/bin/", "/sbin/", "/private/var/db/",
-    ]
+    /// Undo-manifest store shared across deletion surfaces (enables Restore Last Cleanup).
+    static let manifestStore = CleanupManifestStore()
 
-    /// Validate that a path is safe to delete
-    private static func isSafePath(_ path: String) -> Bool {
-        let resolved = (path as NSString).resolvingSymlinksInPath
-        // Never delete a protected root path
-        if protectedPaths.contains(resolved) { return false }
-        // Never delete anything under forbidden prefixes
-        for prefix in forbiddenPrefixes {
-            if resolved.hasPrefix(prefix) { return false }
+    /// Marketing version string for audit/manifest headers.
+    static var appVersionString: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+    }
+
+    /// Validate that a path is safe to delete. Delegates to `DeletionPolicy` so the
+    /// rules live in one testable place shared across every deletion surface.
+    static func isSafePath(_ path: String) -> Bool {
+        deletionPolicy.isSafeToDelete(path)
+    }
+
+    /// Whether the most recent cleanup left any recoverable (trashed) items.
+    var canRestoreLastCleanup: Bool {
+        (Self.manifestStore.mostRecent()?.entries.isEmpty == false)
+    }
+
+    /// Restore the most recent cleanup by moving trashed items back to their original
+    /// locations. Returns the outcome, or `nil` if there is nothing to restore.
+    @discardableResult
+    func restoreLastCleanup() async -> RestoreOutcome? {
+        guard let manifest = Self.manifestStore.mostRecent(), !manifest.entries.isEmpty else {
+            return nil
         }
-        // Require minimum depth (at least 3 components: / Users / name / something)
-        let components = resolved.split(separator: "/")
-        if components.count < 3 { return false }
-        return true
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let outcome = Self.manifestStore.restore(manifest)
+                continuation.resume(returning: outcome)
+            }
+        }
     }
 
     // MARK: - Memory Pressure Monitoring
@@ -270,6 +268,9 @@ class CleanupManager {
     }
     private var settingScanVirtualEnvironments: Bool {
         UserDefaults.standard.object(forKey: "scanVirtualEnvironments") as? Bool ?? true
+    }
+    private var settingScanRustTargets: Bool {
+        UserDefaults.standard.object(forKey: "scanRustTargets") as? Bool ?? true
     }
     private var settingScreenRecordingThresholdDays: Int {
         let v = UserDefaults.standard.integer(forKey: "screenRecordingThresholdDays")
@@ -804,6 +805,96 @@ class CleanupManager {
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/Library/MobileDevice/Provisioning Profiles"]
         },
+
+        // ═══════════ DEVELOPER TOOL CACHES (F6) — all regenerable ═══════════
+
+        ScanDefinition(name: "Browser Automation Binaries", icon: "cursorarrow.rays", color: .teal,
+            description: "Playwright/Cypress/Puppeteer browser downloads — re-fetched on next install",
+            group: .developer, safetyLevel: .safe) {
+            ["\(home)/Library/Caches/ms-playwright", "\(home)/Library/Caches/Cypress",
+             "\(home)/Library/Caches/puppeteer", "\(home)/.cache/selenium",
+             "\(home)/.cache/ms-playwright"]
+        },
+
+        ScanDefinition(name: "uv / Python Tooling Cache", icon: "puzzlepiece.extension", color: .green,
+            description: "uv, pre-commit, and pip-tools caches — rebuilt automatically",
+            group: .packageManagers, safetyLevel: .safe) {
+            ["\(home)/.cache/uv", "\(home)/Library/Caches/uv",
+             "\(home)/.cache/pre-commit", "\(home)/Library/Caches/pip-tools"]
+        },
+
+        ScanDefinition(name: "Compiler Caches", icon: "hammer.circle", color: .gray,
+            description: "ccache / sccache / zig build caches — rebuilt on next compile",
+            group: .developer, safetyLevel: .safe) {
+            ["\(home)/.ccache", "\(home)/Library/Caches/sccache",
+             "\(home)/.cache/sccache", "\(home)/.cache/zig"]
+        },
+
+        ScanDefinition(name: "JS Build Caches", icon: "bolt.horizontal", color: .yellow,
+            description: "Turborepo / Nx build caches — rebuilt on next build",
+            group: .packageManagers, safetyLevel: .safe) {
+            ["\(home)/.turbo", "\(home)/.nx/cache"]
+        },
+
+        ScanDefinition(name: "IaC & Cloud CLI Caches", icon: "cloud", color: .blue,
+            description: "Terraform / Helm / kube / AWS / gcloud cache data — rebuilt on demand",
+            group: .developer, safetyLevel: .safe) {
+            ["\(home)/.terraform.d/plugin-cache", "\(home)/Library/Caches/helm",
+             "\(home)/.kube/cache", "\(home)/.aws/cli/cache", "\(home)/.config/gcloud/logs"]
+        },
+
+        ScanDefinition(name: "ML / AI Framework Caches", icon: "brain", color: .purple,
+            description: "PyTorch / Whisper / Keras download caches — re-downloaded when needed",
+            group: .developer, safetyLevel: .review, defaultSelected: false) {
+            ["\(home)/.cache/torch", "\(home)/.cache/whisper", "\(home)/.keras/datasets"]
+        },
+
+        ScanDefinition(name: "Container / VM Images", icon: "shippingbox", color: .orange,
+            description: "Colima / Lima / minikube local VM data — deleting removes local VMs",
+            group: .developer, safetyLevel: .review, defaultSelected: false) {
+            ["\(home)/.colima", "\(home)/.lima", "\(home)/.minikube/cache"]
+        },
+
+        // ═══════════ APP / MEDIA / CLOUD CACHES (F7) — cache dirs only, regenerable ═══════════
+
+        ScanDefinition(name: "WeChat Cache", icon: "message", color: .green,
+            description: "WeChat cached data — rebuilt automatically (chat history is not touched)",
+            group: .applications, safetyLevel: .safe) {
+            ["\(home)/Library/Containers/com.tencent.xinWeChat/Data/Library/Caches"]
+        },
+
+        ScanDefinition(name: "OneDrive Cache", icon: "cloud", color: .blue,
+            description: "OneDrive local cache — re-synced from the cloud",
+            group: .applications, safetyLevel: .safe) {
+            ["\(home)/Library/Containers/com.microsoft.OneDrive-mac/Data/Library/Caches"]
+        },
+
+        ScanDefinition(name: "Dropbox Cache", icon: "cloud", color: .blue,
+            description: "Dropbox local cache — safe to remove, re-synced from the cloud",
+            group: .applications, safetyLevel: .safe) {
+            ["\(home)/Dropbox/.dropbox.cache",
+             "\(home)/Library/CloudStorage/Dropbox/.dropbox.cache"]
+        },
+
+        ScanDefinition(name: "Steam Shader Cache", icon: "gamecontroller", color: .indigo,
+            description: "Steam shader and HTTP caches — rebuilt while playing",
+            group: .applications, safetyLevel: .safe) {
+            ["\(home)/Library/Application Support/Steam/steamapps/shadercache",
+             "\(home)/Library/Application Support/Steam/appcache/httpcache",
+             "\(home)/Library/Application Support/Steam/steamapps/downloading"]
+        },
+
+        ScanDefinition(name: "Podcasts Cache", icon: "mic", color: .purple,
+            description: "Apple Podcasts cached episodes — re-downloaded on demand",
+            group: .applications, safetyLevel: .review, defaultSelected: false) {
+            ["\(home)/Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache"]
+        },
+
+        ScanDefinition(name: "Music Artwork Cache", icon: "music.note", color: .pink,
+            description: "Apple Music artwork cache — rebuilt automatically",
+            group: .applications, safetyLevel: .safe) {
+            ["\(home)/Library/Containers/com.apple.Music/Data/Library/Caches"]
+        },
     ]
 
     // MARK: - Disk Usage
@@ -827,12 +918,18 @@ class CleanupManager {
 
     // MARK: - Main Scan
 
-    func scan() async {
+    /// Scan for cleanable items. When `onlyGroup` is set, only that category group is
+    /// (re)scanned and all other groups' existing results and selections are preserved.
+    func scan(onlyGroup: CategoryGroup? = nil) async {
         await MainActor.run {
             isScanning = true
             scanComplete = false
             cleanComplete = false
-            categories = []
+            if let onlyGroup {
+                categories.removeAll { $0.group == onlyGroup }
+            } else {
+                categories = []
+            }
             currentScanItem = ""
             scanProgress = 0
             scanErrors = []
@@ -840,6 +937,12 @@ class CleanupManager {
         }
         cancelLock.withLock { $0 = false }
         resetScannedPaths()
+        // For a single-group rescan, keep the dedup set aware of paths owned by the
+        // preserved groups so the generic cache walkers don't reclaim them.
+        if onlyGroup != nil {
+            let preservedPaths = await MainActor.run { categories.flatMap(\.paths) }
+            for path in preservedPaths { insertScannedPath(path) }
+        }
         startMemoryMonitoring()
 
         fetchDiskUsage()
@@ -853,8 +956,63 @@ class CleanupManager {
         let scanBrokenSymlinks = settingScanBrokenSymlinks
         let scanScreenRecordings = settingScanScreenRecordings
         let scanVenvs = settingScanVirtualEnvironments
+        let scanRustTargets = settingScanRustTargets
         let scanLargeFiles = settingScanLargeFiles
-        let estimatedSmartScans = 6 + (scanDocker ? 3 : 0) + (scanUnusedApps ? 1 : 0) + (scanNodeModules ? 1 : 0) + 2 + 1 + (scanIOSBackups ? 1 : 0) + (scanIMessage ? 1 : 0) + (scanBrokenSymlinks ? 1 : 0) + (scanScreenRecordings ? 1 : 0) + (scanVenvs ? 1 : 0) + (scanLargeFiles ? 1 : 0)
+
+        // Phase 2 scanners, each tagged with the category group it produces so a
+        // single-group rescan can run only the relevant ones. Built here (before Phase 1)
+        // so the progress estimate can be derived from the actual filtered set.
+        typealias SmartScan = (label: String, group: CategoryGroup, run: () async -> CleanupCategory?)
+        var smartScans: [SmartScan] = [
+            ("Scanning all app caches...",       .system,  { await self.scanAllCaches() }),
+            ("Scanning shared container caches...", .system, { await self.scanGroupContainerCaches() }),
+            ("Scanning system caches...",        .system,  { await self.scanSystemCaches() }),
+            ("Scanning old screenshots...",      .system,  { await self.scanOldScreenshots() }),
+            ("Scanning installer files...",      .system,  { await self.scanInstallerFiles() }),
+            ("Scanning old downloads...",        .system,  { await self.scanOldDownloads() }),
+        ]
+        if scanDocker {
+            smartScans.append(("Scanning Docker images...",      .docker, { await self.scanDockerImages() }))
+            smartScans.append(("Scanning Docker containers...",  .docker, { await self.scanDockerStoppedContainers() }))
+            smartScans.append(("Scanning Docker build cache...", .docker, { await self.scanDockerBuildCache() }))
+        }
+        smartScans.append(("Scanning Ollama models...",     .developer,       { await self.scanOllamaModels() }))
+        if scanUnusedApps {
+            smartScans.append(("Scanning unused apps...",   .applications,    { await self.scanUnusedApplications() }))
+        }
+        if scanNodeModules {
+            smartScans.append(("Scanning node_modules...",  .packageManagers, { await self.scanNodeModules() }))
+        }
+        smartScans.append(("Scanning mail attachments...",  .system,          { await self.scanMailAttachments() }))
+        smartScans.append(("Scanning app leftovers...",     .applications,    { await self.scanOrphanedAppData() }))
+        smartScans.append(("Scanning iOS software updates...", .system,       { await self.scanIPSWFiles() }))
+        if scanIOSBackups {
+            smartScans.append(("Scanning iOS backups...",   .system,          { await self.scanIOSBackups() }))
+        }
+        if scanIMessage {
+            smartScans.append(("Scanning iMessage attachments...", .system,   { await self.scanIMessageAttachments() }))
+        }
+        if scanBrokenSymlinks {
+            smartScans.append(("Scanning broken symlinks...", .system,        { await self.scanBrokenSymlinks() }))
+        }
+        if scanScreenRecordings {
+            smartScans.append(("Scanning screen recordings...", .storage,     { await self.scanScreenRecordings() }))
+        }
+        if scanRustTargets {
+            smartScans.append(("Scanning Rust target dirs...", .packageManagers, { await self.scanRustTargets() }))
+        }
+        if scanVenvs {
+            smartScans.append(("Scanning virtual environments...", .packageManagers, { await self.scanVirtualEnvironments() }))
+        }
+        if scanLargeFiles {
+            smartScans.append(("Scanning large files...",   .largeFiles,      { await self.scanLargeFiles() }))
+        }
+
+        // Restrict to a single group's scanners when doing an individual rescan.
+        if let onlyGroup {
+            smartScans = smartScans.filter { $0.group == onlyGroup }
+        }
+        let estimatedSmartScans = smartScans.count
 
         // Phase 1: Specific known-safe targets
         // First pass: collect all paths so we can detect parent-child overlaps
@@ -867,6 +1025,15 @@ class CleanupManager {
 
         for (index, definition) in scanDefinitions.enumerated() {
             if cancelRequested { break }
+
+            // Single-group rescan: skip definitions from other groups (their existing
+            // results are preserved). Still advance progress so the bar stays accurate.
+            if let onlyGroup, definition.group != onlyGroup {
+                await MainActor.run {
+                    scanProgress = Double(index + 1) / Double(totalDefs + estimatedSmartScans)
+                }
+                continue
+            }
 
             await MainActor.run { currentScanItem = definition.name }
 
@@ -910,7 +1077,11 @@ class CleanupManager {
                         name: definition.name, icon: definition.icon,
                         color: definition.color, description: definition.description,
                         group: definition.group, safetyLevel: definition.safetyLevel,
-                        paths: existingPaths, breakdown: breakdown,
+                        paths: existingPaths,
+                        // Confine deletion to exactly the definition's resolved target
+                        // dirs — the scan may only ever remove children of these.
+                        allowedRoots: existingPaths,
+                        breakdown: breakdown,
                         deleteChildrenOnly: true,
                         size: combinedSize, fileCount: combinedCount,
                         isSelected: definition.defaultSelected
@@ -924,67 +1095,13 @@ class CleanupManager {
             }
         }
 
-        // Phase 2: Comprehensive walkers + smart scans
-        var smartScans: [(String, () async -> CleanupCategory?)] = [
-            // SAFE: Cache directory walkers (caches always rebuild)
-            ("Scanning all app caches...",       { await self.scanAllCaches() }),
-            ("Scanning system caches...",        { await self.scanSystemCaches() }),
-            // REVIEW: User file scanners (need user decision)
-            ("Scanning old screenshots...",      { await self.scanOldScreenshots() }),
-            ("Scanning installer files...",      { await self.scanInstallerFiles() }),
-            ("Scanning old downloads...",        { await self.scanOldDownloads() }),
-        ]
-
-        if scanDocker {
-            smartScans.append(("Scanning Docker images...",      { await self.scanDockerImages() }))
-            smartScans.append(("Scanning Docker containers...",  { await self.scanDockerStoppedContainers() }))
-            smartScans.append(("Scanning Docker build cache...", { await self.scanDockerBuildCache() }))
-        }
-        // Ollama models (always scan if installed — fast CLI call)
-        smartScans.append(("Scanning Ollama models...",     { await self.scanOllamaModels() }))
-
-        if scanUnusedApps {
-            smartScans.append(("Scanning unused apps...",        { await self.scanUnusedApplications() }))
-        }
-        if scanNodeModules {
-            smartScans.append(("Scanning node_modules...",       { await self.scanNodeModules() }))
-        }
-
-        // Always scan these
-        smartScans.append(("Scanning mail attachments...",   { await self.scanMailAttachments() }))
-        smartScans.append(("Scanning app leftovers...",      { await self.scanOrphanedAppData() }))
-
-        // Conditionally enabled scans
-        smartScans.append(("Scanning iOS software updates...", { await self.scanIPSWFiles() }))  // Always scan (small/fast)
-        if scanIOSBackups {
-            smartScans.append(("Scanning iOS backups...",        { await self.scanIOSBackups() }))
-        }
-        if scanIMessage {
-            smartScans.append(("Scanning iMessage attachments...", { await self.scanIMessageAttachments() }))
-        }
-        if scanBrokenSymlinks {
-            smartScans.append(("Scanning broken symlinks...",     { await self.scanBrokenSymlinks() }))
-        }
-        if scanScreenRecordings {
-            smartScans.append(("Scanning screen recordings...",   { await self.scanScreenRecordings() }))
-        }
-
-        // iCloud and duplicate scanning removed — handled by standalone tools
-
-        if scanVenvs {
-            smartScans.append(("Scanning virtual environments...", { await self.scanVirtualEnvironments() }))
-        }
-        if scanLargeFiles {
-            smartScans.append(("Scanning large files...",     { await self.scanLargeFiles() }))
-        }
-        // Duplicate scanning moved to standalone Duplicate Finder tool
-
+        // Phase 2: Comprehensive walkers + smart scans (built and filtered above).
         let totalSmartScans = smartScans.count
-        for (index, (name, scanner)) in smartScans.enumerated() {
+        for (index, entry) in smartScans.enumerated() {
             if cancelRequested { break }
-            await MainActor.run { currentScanItem = name }
+            await MainActor.run { currentScanItem = entry.label }
 
-            if let category = await scanner() {
+            if let category = await entry.run() {
                 await MainActor.run { categories.append(category) }
             }
 
@@ -1041,7 +1158,7 @@ class CleanupManager {
     }
 
     private func insertScannedPath(_ path: String) {
-        scannedPathsLock.withLock { $0.insert(path) }
+        scannedPathsLock.withLock { _ = $0.insert(path) }
     }
 
     private func isPathScanned(_ path: String) -> Bool {
@@ -1078,6 +1195,14 @@ class CleanupManager {
         let selectedCategories = categories.filter(\.isSelected)
         let useTrash = settingPreferTrash
         let totalCategories = selectedCategories.count
+
+        // Undo manifest for this cleanup session. Only trashed (recoverable) items are
+        // recorded; permanent deletes cannot be undone.
+        var sessionManifest = CleanupManifest(
+            sessionID: ProcessInfo.processInfo.globallyUniqueString,
+            appVersion: Self.appVersionString,
+            trashMode: useTrash
+        )
 
         for (catIndex, category) in selectedCategories.enumerated() {
             if category.isDockerResource, let command = category.dockerCleanCommand {
@@ -1119,46 +1244,37 @@ class CleanupManager {
                 effectivePaths = paths
             }
             let effectiveDeleteChildrenOnly = usePerFile ? false : deleteChildrenOnly
+            // Territory this category may delete within: its declared allowedRoots, or
+            // (when unset) its full declared paths. Every concrete deletion — including
+            // children discovered at delete time — must fall inside this.
+            let effectiveAllowedRoots = category.allowedRoots.isEmpty ? paths : category.allowedRoots
 
-            let errors: [String] = await withCheckedContinuation { (continuation: CheckedContinuation<[String], Never>) in
+            let result: (errors: [String], removals: [FileRemover.Removal]) = await withCheckedContinuation { continuation in
                 DispatchQueue.global(qos: .userInitiated).async {
                     let fm = FileManager.default
                     var localErrors: [String] = []
                     var auditLog: [(path: String, size: Int64, trashedOrDeleted: String)] = []
                     var needsAdminPaths: [String] = []
-                    let uid = getuid()
+                    var removals: [FileRemover.Removal] = []
 
-                    func isOwnedByUser(_ path: String) -> Bool {
-                        guard let attrs = try? fm.attributesOfItem(atPath: path),
-                              let ownerID = attrs[.ownerAccountID] as? UInt32 else { return false }
-                        return ownerID == uid
-                    }
+                    // Single deletion service — same safety rules, trash-capture, and
+                    // records as every other surface.
+                    let remover = FileRemover(policy: Self.deletionPolicy, useTrash: useTrash)
 
                     func deleteItem(at url: URL) {
-                        let path = url.path
-                        // Safety: reject protected paths
-                        if !Self.isSafePath(path) {
-                            localErrors.append("\(categoryName): Blocked deletion of protected path — \(url.lastPathComponent)")
-                            return
-                        }
-
-                        // Get size for audit log
-                        let fileSize: Int64 = (try? fm.attributesOfItem(atPath: path))?[.size] as? Int64 ?? 0
-
-                        if useTrash {
-                            if (try? fm.trashItem(at: url, resultingItemURL: nil)) != nil {
-                                auditLog.append((path: path, size: fileSize, trashedOrDeleted: "TRASH"))
-                            } else {
-                                // Trash failed — collect for admin escalation
-                                needsAdminPaths.append(path)
-                            }
-                        } else {
-                            do {
-                                try fm.removeItem(at: url)
-                                auditLog.append((path: path, size: fileSize, trashedOrDeleted: "DELETE"))
-                            } catch {
-                                localErrors.append("\(categoryName): Failed to remove \(url.lastPathComponent) — \(error.localizedDescription)")
-                            }
+                        switch remover.remove(url.path, allowedRoots: effectiveAllowedRoots) {
+                        case .removed(let removal):
+                            removals.append(removal)
+                            auditLog.append((path: removal.originalPath, size: removal.size,
+                                             trashedOrDeleted: removal.method))
+                        case .blocked(let name):
+                            localErrors.append("\(categoryName): Blocked deletion of protected path — \(name)")
+                        case .skippedICloud:
+                            localErrors.append("\(categoryName): Skipped iCloud-synced item — \(url.lastPathComponent)")
+                        case .needsAdmin(let path):
+                            needsAdminPaths.append(path)
+                        case .failed(let message):
+                            localErrors.append("\(categoryName): Failed to remove \(url.lastPathComponent) — \(message)")
                         }
                     }
 
@@ -1222,8 +1338,22 @@ class CleanupManager {
                     // Write deletion audit log
                     Self.writeDeletionLog(entries: auditLog)
 
-                    continuation.resume(returning: localErrors)
+                    continuation.resume(returning: (localErrors, removals))
                 }
+            }
+
+            let errors = result.errors
+
+            // Record undoable removals into the session manifest, written incrementally
+            // so a crash mid-clean still leaves a restorable partial manifest.
+            let undoable = result.removals.filter { $0.trashedPath != nil }
+            if !undoable.isEmpty {
+                sessionManifest.entries.append(contentsOf: undoable.map {
+                    CleanupManifestEntry(originalPath: $0.originalPath,
+                                         trashedPath: $0.trashedPath!,
+                                         size: $0.size, category: categoryName)
+                })
+                Self.manifestStore.save(sessionManifest)
             }
 
             await MainActor.run {
@@ -1236,6 +1366,9 @@ class CleanupManager {
                 cleanProgress = Double(catIndex + 1) / Double(totalCategories)
             }
         }
+
+        // Keep the manifest history bounded.
+        Self.manifestStore.prune()
 
         await MainActor.run {
             isCleaning = false
@@ -1428,6 +1561,64 @@ class CleanupManager {
                     description: "\(paths.count) app caches — safe to remove, rebuilt automatically",
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: Array(sorted.prefix(60)),
+                    deleteChildrenOnly: true,
+                    size: totalSize, fileCount: totalCount,
+                    isSelected: true
+                ))
+            }
+        }
+    }
+
+    /// Walks `~/Library/Group Containers/<id>/Library/Caches` for every sandboxed app —
+    /// only the `Caches` subdir of each container is touched, never any data. Catches
+    /// sandboxed-app caches the plain `~/Library/Caches` walker can't see (F8).
+    private func scanGroupContainerCaches() async -> CleanupCategory? {
+        let fm = FileManager.default
+        let root = "\(Self.home)/Library/Group Containers"
+        guard fm.fileExists(atPath: root) else { return nil }
+
+        let scannedSnapshot = scannedPathsSnapshot()
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let containers = try? fm.contentsOfDirectory(atPath: root) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                var paths: [String] = []
+                var breakdown: [PathStat] = []
+                var totalSize: Int64 = 0
+                var totalCount: Int = 0
+
+                for container in containers {
+                    autoreleasepool {
+                        let cachesPath = "\(root)/\(container)/Library/Caches"
+                        var isDir: ObjCBool = false
+                        guard fm.fileExists(atPath: cachesPath, isDirectory: &isDir), isDir.boolValue else { return }
+                        if scannedSnapshot.contains(cachesPath) { return }
+
+                        let (sz, ct) = Self.directorySizeSync(cachesPath)
+                        if sz > ScanConstants.minCacheSizeBytes {
+                            paths.append(cachesPath)
+                            breakdown.append(PathStat(path: cachesPath, size: sz, fileCount: ct))
+                            totalSize += sz
+                            totalCount += ct
+                        }
+                    }
+                }
+
+                guard totalSize > ScanConstants.minCacheTotalBytes, !paths.isEmpty else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                breakdown.sort { $0.size > $1.size }
+
+                continuation.resume(returning: CleanupCategory(
+                    name: "Shared Container Caches", icon: "archivebox.fill", color: .blue,
+                    description: "\(paths.count) sandboxed-app cache(s) — safe to remove, rebuilt automatically",
+                    group: .system, safetyLevel: .safe,
+                    paths: paths, breakdown: Array(breakdown.prefix(60)),
                     deleteChildrenOnly: true,
                     size: totalSize, fileCount: totalCount,
                     isSelected: true
@@ -2118,6 +2309,117 @@ class CleanupManager {
         }
     }
 
+    // MARK: - Rust target directories
+
+    /// Finds `target/` build directories in Rust projects (a `target` dir whose parent
+    /// also contains `Cargo.toml`). Mirrors the node_modules scan; regenerable via
+    /// `cargo build`. (Issue #3 remainder.)
+    private func scanRustTargets() async -> CleanupCategory? {
+        let fm = FileManager.default
+        var searchDirs = [
+            "\(Self.home)/Projects", "\(Self.home)/Developer",
+            "\(Self.home)/Documents", "\(Self.home)/Desktop",
+            "\(Self.home)/GitHub", "\(Self.home)/repos",
+            "\(Self.home)/code", "\(Self.home)/src",
+            "\(Self.home)/dev", "\(Self.home)/workspace",
+            "\(Self.home)/Work", "\(Self.home)/rust",
+        ]
+
+        if let topLevel = try? fm.contentsOfDirectory(atPath: Self.home) {
+            for dir in topLevel where !dir.hasPrefix(".") {
+                let fullPath = (Self.home as NSString).appendingPathComponent(dir)
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue,
+                   !["Library", "Applications", "Music", "Movies", "Pictures",
+                    "Downloads", "Public"].contains(dir),
+                   !searchDirs.contains(fullPath) {
+                    searchDirs.append(fullPath)
+                }
+            }
+        }
+
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let fm = FileManager.default
+                var found: [String] = []
+                var breakdown: [PathStat] = []
+                var totalSize: Int64 = 0
+                var totalCount: Int = 0
+
+                for searchDir in searchDirs where fm.fileExists(atPath: searchDir) {
+                    Self.findRustTargetsRecursive(
+                        in: searchDir, depth: 0, maxDepth: 6, fm: fm,
+                        found: &found, breakdown: &breakdown,
+                        totalSize: &totalSize, totalCount: &totalCount
+                    )
+                }
+
+                guard !found.isEmpty else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                breakdown.sort { $0.size > $1.size }
+
+                continuation.resume(returning: CleanupCategory(
+                    name: "Rust target directories", icon: "gearshape.2", color: .orange,
+                    description: "\(found.count) target dir\(found.count == 1 ? "" : "s") — run cargo build to restore",
+                    group: .packageManagers, safetyLevel: .safe,
+                    paths: found, breakdown: Array(breakdown.prefix(50)),
+                    deleteChildrenOnly: false,
+                    size: totalSize, fileCount: totalCount,
+                    isSelected: true
+                ))
+            }
+        }
+    }
+
+    /// Recursively finds Rust `target/` directories. A `target` dir qualifies only when
+    /// its parent directory also contains `Cargo.toml` — the guard that keeps Maven/Java
+    /// `target/` dirs (and any other coincidental name) out of the results. Never
+    /// descends into a matched `target/`. `minSize` is a parameter so tests can use 0.
+    static func findRustTargetsRecursive(
+        in dir: String, depth: Int, maxDepth: Int, fm: FileManager,
+        found: inout [String], breakdown: inout [PathStat],
+        totalSize: inout Int64, totalCount: inout Int,
+        minSize: Int64 = 1_000_000
+    ) {
+        guard depth < maxDepth else { return }
+        guard let entries = try? fm.contentsOfDirectory(atPath: dir) else { return }
+        let entrySet = Set(entries)
+
+        // This directory is a Rust project root with a build dir.
+        if entrySet.contains("Cargo.toml"), entrySet.contains("target") {
+            let targetPath = (dir as NSString).appendingPathComponent("target")
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: targetPath, isDirectory: &isDir), isDir.boolValue {
+                let (sz, ct) = directorySizeSync(targetPath)
+                if sz >= minSize {
+                    found.append(targetPath)
+                    breakdown.append(PathStat(path: targetPath, size: sz, fileCount: ct))
+                    totalSize += sz
+                    totalCount += ct
+                }
+            }
+        }
+
+        for entry in entries {
+            autoreleasepool {
+                let fullPath = (dir as NSString).appendingPathComponent(entry)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue else { return }
+                // Never descend into a target dir or noisy/heavy dirs.
+                if entry == "target" || entry == "node_modules" || entry == "Library"
+                    || entry.hasPrefix(".") { return }
+                findRustTargetsRecursive(
+                    in: fullPath, depth: depth + 1, maxDepth: maxDepth, fm: fm,
+                    found: &found, breakdown: &breakdown,
+                    totalSize: &totalSize, totalCount: &totalCount, minSize: minSize
+                )
+            }
+        }
+    }
+
     // MARK: - Mail Attachments
 
     private func scanMailAttachments() async -> CleanupCategory? {
@@ -2787,77 +3089,161 @@ class CleanupManager {
     }
 
     /// Feature 8: Broken Symlinks
+    ///
+    /// Directories excluded from the `~/Library` walk. Beyond the original set, this
+    /// skips cloud-storage file-provider mounts (Dropbox/Google Drive/OneDrive) and
+    /// other heavy trees where enumeration can trigger network metadata fetches and
+    /// effectively hang — the root cause of the "Scanning broken symlinks…" stall
+    /// (issue #9).
+    static let brokenSymlinkExcludeDirs: Set<String> = [
+        "Keychains", "Group Containers", "Mail", "Caches", "Containers", "Developer",
+        // Added for issue #9: cloud + heavy provider trees
+        "CloudStorage", "Mobile Documents", "Photos", "Biome", "Metadata",
+        "Daemon Containers", "Autosave Information"
+    ]
+
+    /// Traversal depth cap for the `~/Library` root. Broken symlinks deeper than this
+    /// are effectively never user-cleanable, and the cap prevents pathological trees
+    /// from wedging the scan.
+    static let brokenSymlinkMaxDepth = 6
+
+    /// Absolute safety valve on total entries visited across all roots.
+    static let brokenSymlinkMaxIterations = 200_000
+
     private func scanBrokenSymlinks() async -> CleanupCategory? {
-        let dirs = [
+        let roots = [
             "\(Self.home)/Library",
             "/usr/local/bin",
             "/opt/homebrew/bin"
         ]
-        let excludeDirs: Set<String> = ["Keychains", "Group Containers", "Mail",
-                                        "Caches", "Containers", "Developer"]
+        // Only the deep `~/Library` tree gets a depth cap; the bin dirs are flat.
+        let depthCappedRoots: Set<String> = ["\(Self.home)/Library"]
 
         return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let fm = FileManager.default
-                var filePaths: [String] = []
-                var breakdown: [PathStat] = []
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let result = Self.findBrokenSymlinks(
+                    roots: roots,
+                    excludeDirs: Self.brokenSymlinkExcludeDirs,
+                    depthCappedRoots: depthCappedRoots,
+                    maxDepth: Self.brokenSymlinkMaxDepth,
+                    maxIterations: Self.brokenSymlinkMaxIterations,
+                    isCancelled: { self?.cancelRequested ?? true }
+                )
 
-                for dir in dirs where fm.fileExists(atPath: dir) {
-                    guard let enumerator = fm.enumerator(
-                        at: URL(fileURLWithPath: dir),
-                        includingPropertiesForKeys: [.isSymbolicLinkKey],
-                        options: [.skipsPackageDescendants]
-                    ) else { continue }
-
-                    while let obj = enumerator.nextObject() {
-                        guard let url = obj as? URL else { continue }
-                        autoreleasepool {
-                            // Skip excluded directories
-                            let components = url.pathComponents
-                            if components.contains(where: { excludeDirs.contains($0) }) {
-                                enumerator.skipDescendants()
-                                return
-                            }
-
-                            guard let rv = try? url.resourceValues(forKeys: [.isSymbolicLinkKey]),
-                                  rv.isSymbolicLink == true else { return }
-
-                            // Detect broken symlink
-                            guard let target = try? fm.destinationOfSymbolicLink(atPath: url.path) else { return }
-                            let resolvedTarget: String
-                            if target.hasPrefix("/") {
-                                resolvedTarget = target
-                            } else {
-                                resolvedTarget = ((url.path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(target)
-                            }
-
-                            // Skip if target is on external volume
-                            if resolvedTarget.hasPrefix("/Volumes/") { return }
-
-                            if !fm.fileExists(atPath: resolvedTarget) {
-                                filePaths.append(url.path)
-                                breakdown.append(PathStat(path: url.path, size: 0, fileCount: 1))
-                            }
-                        }
-                    }
-                }
-
-                guard !filePaths.isEmpty else {
+                // Partial results are acceptable — if the walk was cancelled or hit the
+                // watchdog after finding some broken links, still surface them.
+                guard !result.filePaths.isEmpty else {
                     continuation.resume(returning: nil)
                     return
                 }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Broken Symlinks (\(filePaths.count) found)", icon: "link", color: .gray,
+                    name: "Broken Symlinks (\(result.filePaths.count) found)", icon: "link", color: .gray,
                     description: "Symbolic links pointing to nonexistent targets",
                     group: .system, safetyLevel: .review,
-                    paths: filePaths, breakdown: breakdown,
+                    paths: result.filePaths, breakdown: result.breakdown,
                     deleteChildrenOnly: false,
-                    size: 0, fileCount: filePaths.count,
+                    size: 0, fileCount: result.filePaths.count,
                     isSelected: false
                 ))
             }
         }
+    }
+
+    /// Outcome of a broken-symlink walk. `wasCancelled`/`hitWatchdog` let callers and
+    /// tests distinguish a complete walk from an interrupted one.
+    struct BrokenSymlinkScanResult {
+        var filePaths: [String] = []
+        var breakdown: [PathStat] = []
+        var wasCancelled = false
+        var hitWatchdog = false
+    }
+
+    /// Pure, testable core of the broken-symlink scan.
+    ///
+    /// Checks `isCancelled()` on every iteration so the scan stops promptly when the
+    /// user hits Cancel (the second half of issue #9), caps traversal depth under
+    /// `depthCappedRoots`, and bails after `maxIterations` entries as a last resort.
+    static func findBrokenSymlinks(
+        roots: [String],
+        excludeDirs: Set<String>,
+        depthCappedRoots: Set<String>,
+        maxDepth: Int,
+        maxIterations: Int,
+        isCancelled: () -> Bool
+    ) -> BrokenSymlinkScanResult {
+        let fm = FileManager.default
+        var result = BrokenSymlinkScanResult()
+        var iterations = 0
+        let resourceKeys: [URLResourceKey] = [.isSymbolicLinkKey, .isUbiquitousItemKey]
+
+        outer: for root in roots where fm.fileExists(atPath: root) {
+            let capDepth = depthCappedRoots.contains(root)
+            guard let enumerator = fm.enumerator(
+                at: URL(fileURLWithPath: root),
+                includingPropertiesForKeys: resourceKeys,
+                options: [.skipsPackageDescendants]
+            ) else { continue }
+
+            while let obj = enumerator.nextObject() {
+                // Prompt cancellation — break out of both loops.
+                if isCancelled() {
+                    result.wasCancelled = true
+                    break outer
+                }
+                iterations += 1
+                if iterations > maxIterations {
+                    result.hitWatchdog = true
+                    break outer
+                }
+
+                guard let url = obj as? URL else { continue }
+                autoreleasepool {
+                    // Depth cap (only for flagged roots). enumerator.level is 1 at the
+                    // first level below the root.
+                    if capDepth && enumerator.level > maxDepth {
+                        enumerator.skipDescendants()
+                        return
+                    }
+
+                    // Skip excluded directories (and their subtrees).
+                    let components = url.pathComponents
+                    if components.contains(where: { excludeDirs.contains($0) }) {
+                        enumerator.skipDescendants()
+                        return
+                    }
+
+                    let rv = try? url.resourceValues(forKeys: Set(resourceKeys))
+
+                    // Never descend into iCloud/file-provider materialization points.
+                    if rv?.isUbiquitousItem == true {
+                        enumerator.skipDescendants()
+                        return
+                    }
+
+                    guard rv?.isSymbolicLink == true else { return }
+
+                    // Detect broken symlink
+                    guard let target = try? fm.destinationOfSymbolicLink(atPath: url.path) else { return }
+                    let resolvedTarget: String
+                    if target.hasPrefix("/") {
+                        resolvedTarget = target
+                    } else {
+                        resolvedTarget = ((url.path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(target)
+                    }
+
+                    // Skip if target is on external volume
+                    if resolvedTarget.hasPrefix("/Volumes/") { return }
+
+                    if !fm.fileExists(atPath: resolvedTarget) {
+                        result.filePaths.append(url.path)
+                        result.breakdown.append(PathStat(path: url.path, size: 0, fileCount: 1))
+                    }
+                }
+            }
+        }
+
+        return result
     }
 
     // MARK: - Helpers

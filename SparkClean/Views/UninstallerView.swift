@@ -339,16 +339,6 @@ class UninstallerManager {
 
     // MARK: - Uninstall
 
-    /// Protected paths that must never be deleted by the uninstaller
-    private static let uninstallerProtectedPaths: Set<String> = {
-        let h = NSHomeDirectory()
-        return [
-            "/", "/System", "/usr", "/bin", "/sbin", "/Applications", "/Library",
-            h, "\(h)/Desktop", "\(h)/Documents", "\(h)/Downloads",
-            "\(h)/Library", "\(h)/Library/Keychains", "\(h)/.ssh", "\(h)/.gnupg",
-        ]
-    }()
-
     func uninstallApp(_ app: AppInfo, trashOnly: Bool = true) async -> Bool {
         // Check if app is running
         let runningApps = NSWorkspace.shared.runningApplications
@@ -364,32 +354,40 @@ class UninstallerManager {
                 var success = true
                 var needsAdminPaths: [String] = []
 
-                // Remove only selected related data
-                for related in app.relatedPaths where related.isSelected {
-                    let resolved = (related.path as NSString).resolvingSymlinksInPath
-                    // Safety: never delete protected paths
-                    if Self.uninstallerProtectedPaths.contains(resolved) { continue }
-                    if resolved.split(separator: "/").count < 3 { continue }
+                // Route every deletion through the shared service. The uninstaller
+                // profile permits removing whole `.app` bundles (never their interior),
+                // while all other DeletionPolicy protections still apply. Removals are
+                // recorded so an uninstall can be undone from the Trash.
+                let policy = DeletionPolicy(allowsApplicationBundles: true)
+                let remover = FileRemover(policy: policy, useTrash: trashOnly)
+                var manifest = CleanupManifest(
+                    sessionID: ProcessInfo.processInfo.globallyUniqueString,
+                    appVersion: CleanupManager.appVersionString,
+                    trashMode: trashOnly
+                )
 
-                    let url = URL(fileURLWithPath: related.path)
-                    if trashOnly {
-                        if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
-                            needsAdminPaths.append(related.path)
+                func remove(_ path: String) {
+                    switch remover.remove(path, allowedRoots: []) {
+                    case .removed(let removal):
+                        if let trashed = removal.trashedPath {
+                            manifest.entries.append(CleanupManifestEntry(
+                                originalPath: removal.originalPath, trashedPath: trashed,
+                                size: removal.size, category: "Uninstall: \(app.name)"))
                         }
-                    } else {
-                        do { try fm.removeItem(at: url) } catch { success = false }
+                    case .needsAdmin(let p):
+                        needsAdminPaths.append(p)
+                    case .blocked, .skippedICloud:
+                        break  // safety refused this path — skip, don't fail the uninstall
+                    case .failed:
+                        success = false
                     }
                 }
 
-                // Remove app bundle
-                let appURL = URL(fileURLWithPath: app.path)
-                if trashOnly {
-                    if (try? fm.trashItem(at: appURL, resultingItemURL: nil)) == nil {
-                        needsAdminPaths.append(app.path)
-                    }
-                } else {
-                    do { try fm.removeItem(at: appURL) } catch { success = false }
+                // Remove only selected related data, then the app bundle itself.
+                for related in app.relatedPaths where related.isSelected {
+                    remove(related.path)
                 }
+                remove(app.path)
 
                 // Escalate to admin privileges for paths that failed normal trashItem
                 if !needsAdminPaths.isEmpty && trashOnly {
@@ -424,6 +422,12 @@ class UninstallerManager {
                         }
                     }
                     try? fm.removeItem(atPath: tempScript)
+                }
+
+                // Persist the undo manifest for this uninstall.
+                if !manifest.entries.isEmpty {
+                    CleanupManager.manifestStore.save(manifest)
+                    CleanupManager.manifestStore.prune()
                 }
 
                 continuation.resume(returning: success)

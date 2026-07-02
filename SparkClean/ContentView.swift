@@ -28,6 +28,8 @@ struct ContentView: View {
     @State private var showHelpSheet = false
     @State private var showPrivacyPolicy = false
     @State private var showCleanErrors = false
+    @State private var showRestoreResult = false
+    @State private var restoreMessage = ""
     @AppStorage("showIntroVideo") private var showIntroVideo = true
     @State private var introPlayed = _introPlayedThisSession
 
@@ -82,6 +84,10 @@ struct ContentView: View {
                     MaintenanceView()
                 case .startupManager:
                     StartupManagerView()
+                case .timeMachine:
+                    TimeMachineView()
+                case .storageInsights:
+                    StorageInsightsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -113,6 +119,12 @@ struct ContentView: View {
             Button("OK") {}
         } message: {
             Text(manager.cleanErrors.prefix(10).joined(separator: "\n") + (manager.cleanErrors.count > 10 ? "\n...and \(manager.cleanErrors.count - 10) more" : ""))
+        }
+        // Restore result
+        .alert("Restore Last Cleanup", isPresented: $showRestoreResult) {
+            Button("OK") {}
+        } message: {
+            Text(restoreMessage)
         }
         .sheet(isPresented: $showExportSheet) {
             ExportReportView(report: $exportReport, isGenerating: $isGeneratingReport)
@@ -154,6 +166,22 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .exportReport)) { _ in
             if manager.scanComplete {
                 generateAndShowReport(verbose: false)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .restoreLastCleanup)) { _ in
+            Task {
+                guard let outcome = await manager.restoreLastCleanup() else {
+                    restoreMessage = "There is no recent cleanup to restore."
+                    showRestoreResult = true
+                    return
+                }
+                var parts = ["Restored \(outcome.restored) item(s) from the Trash."]
+                if outcome.skippedExisting > 0 { parts.append("\(outcome.skippedExisting) skipped (a file already exists at the original location).") }
+                if outcome.missingInTrash > 0 { parts.append("\(outcome.missingInTrash) no longer in the Trash.") }
+                if outcome.failed > 0 { parts.append("\(outcome.failed) could not be restored.") }
+                restoreMessage = parts.joined(separator: "\n")
+                showRestoreResult = true
+                manager.fetchDiskUsage()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
@@ -248,6 +276,24 @@ struct ContentView: View {
                     isSelected: selectedSidebar == .startupManager
                 ) {
                     selectedSidebar = .startupManager
+                }
+
+                SidebarRow(
+                    label: "Time Machine",
+                    icon: "clock.arrow.2.circlepath",
+                    iconColor: .purple,
+                    isSelected: selectedSidebar == .timeMachine
+                ) {
+                    selectedSidebar = .timeMachine
+                }
+
+                SidebarRow(
+                    label: "Storage Insights",
+                    icon: "chart.bar.doc.horizontal",
+                    iconColor: .teal,
+                    isSelected: selectedSidebar == .storageInsights
+                ) {
+                    selectedSidebar = .storageInsights
                 }
             }
         }

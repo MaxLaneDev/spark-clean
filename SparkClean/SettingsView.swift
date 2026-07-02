@@ -161,6 +161,7 @@ struct SettingsView: View {
     @AppStorage("preferTrash") private var preferTrash = true
     @AppStorage("scanLargeFiles") private var scanLargeFiles = true
     @AppStorage("scanVirtualEnvironments") private var scanVirtualEnvironments = true
+    @AppStorage("scanRustTargets") private var scanRustTargets = true
     @AppStorage("screenRecordingThresholdDays") private var screenRecordingThresholdDays = 60
     @AppStorage("scanIOSBackups") private var scanIOSBackups = true
     @AppStorage("scanIMessageAttachments") private var scanIMessageAttachments = true
@@ -169,6 +170,7 @@ struct SettingsView: View {
 @AppStorage("showIntroVideo") private var showIntroVideo = true
     @AppStorage("trashMonitorEnabled") private var trashMonitorEnabled = false
     @AppStorage("checkUpdatesOnLaunch") private var checkUpdatesOnLaunch = false
+    @AppStorage("showMenuBarExtra") private var showMenuBarExtra = false
 
     // Large Files settings
     @AppStorage("largeFileScanDownloads") private var largeFileScanDownloads = true
@@ -223,6 +225,7 @@ struct SettingsView: View {
             Section("Startup") {
                 Toggle("Show intro video on launch", isOn: $showIntroVideo)
                 Toggle("Check for updates on launch", isOn: $checkUpdatesOnLaunch)
+                Toggle("Show menu bar icon", isOn: $showMenuBarExtra)
             }
 
             Section {
@@ -235,6 +238,7 @@ struct SettingsView: View {
 
             Section("Core Scans") {
                 Toggle("Scan node_modules directories", isOn: $scanNodeModules)
+                Toggle("Scan Rust target directories", isOn: $scanRustTargets)
                 Toggle("Scan Docker resources", isOn: $scanDocker)
                 Toggle("Detect unused applications", isOn: $scanUnusedApps)
             }

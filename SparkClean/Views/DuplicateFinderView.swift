@@ -280,6 +280,16 @@ class DuplicateFinderManager {
             let fm = FileManager.default
             var cleanedGroupIDs: Set<UUID> = []
 
+            // Route through the shared deletion service so duplicate removal gets the
+            // same safety rules and an undo record. Territory is permissive (the user
+            // explicitly chose these files), but the global DeletionPolicy still applies.
+            let remover = FileRemover(policy: CleanupManager.deletionPolicy, useTrash: true)
+            var manifest = CleanupManifest(
+                sessionID: ProcessInfo.processInfo.globallyUniqueString,
+                appVersion: CleanupManager.appVersionString,
+                trashMode: true
+            )
+
             for group in selected {
                 // Verify the "original" (kept) file still exists before deleting copies
                 guard fm.fileExists(atPath: group.paths[0]) else { continue }
@@ -289,14 +299,25 @@ class DuplicateFinderManager {
                 var allRemoved = true
                 for path in pathsToRemove {
                     guard fm.fileExists(atPath: path) else { continue }
-                    let url = URL(fileURLWithPath: path)
-                    if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
+                    switch remover.remove(path, allowedRoots: []) {
+                    case .removed(let removal):
+                        if let trashed = removal.trashedPath {
+                            manifest.entries.append(CleanupManifestEntry(
+                                originalPath: removal.originalPath, trashedPath: trashed,
+                                size: removal.size, category: "Duplicate Finder"))
+                        }
+                    default:
                         allRemoved = false
                     }
                 }
                 if allRemoved {
                     cleanedGroupIDs.insert(group.id)
                 }
+            }
+
+            if !manifest.entries.isEmpty {
+                CleanupManager.manifestStore.save(manifest)
+                CleanupManager.manifestStore.prune()
             }
 
             DispatchQueue.main.async {
