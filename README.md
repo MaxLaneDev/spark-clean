@@ -46,8 +46,8 @@ Drag it to Applications and you're done.
 
 SparkClean pays special attention to the kind of junk that piles up on a developer's machine:
 
-- **Docker** - Unused images, stopped containers, dangling volumes, and build cache. Like `docker system prune`, but with a UI so you can see what you're deleting.
-- **Xcode** - DerivedData, archives, old simulators, and device support files.
+- **Docker** - Dangling images, stopped containers, and reclaimable build cache. Like Docker's prune commands, but with a UI so you can review the category first.
+- **Xcode** - DerivedData and simulator caches, plus opt-in archives and device-support files. Simulator devices/runtimes are not removed through raw filesystem cleanup.
 - **Node.js** - Forgotten `node_modules` folders scattered across your projects.
 - **Ollama** - Downloaded models you're no longer using.
 - **JetBrains** - Caches, logs, and local history from IntelliJ, WebStorm, PyCharm, and others.
@@ -56,15 +56,15 @@ SparkClean pays special attention to the kind of junk that piles up on a develop
 
 ## What Else It Does
 
-- **Deep Scan** - Goes through caches, temp files, logs, browser data, and more.
+- **Deep Scan** - Goes through caches, logs, reviewable stale temp files, browser data, and more.
 
 - **Smart Categories** - Sorts everything into groups: System, Storage, Browsers, Developer Tools, Package Managers, Docker, and Applications.
 
 - **Safety Levels** - Every category is labeled **Safe**, **Review**, or **Caution** so you know what's safe to delete before you delete it.
 
-- **App Uninstaller** - Finds all the leftover data from uninstalled apps: preferences, caches, containers, login items, and more.
+- **App Uninstaller** - Finds related preferences, caches, containers, logs, crash reports, and other reviewed leftovers.
 
-- **Duplicate Finder** - Three-pass verification: file size, header comparison, then SHA-256 hash. No false positives.
+- **Duplicate Finder** - Exact duplicates use file size, header comparison, then SHA-256. Visual-similarity groups are clearly marked, kept out of Select All, and require individual review.
 
 - **Large File Hunter** - Finds large files you may have forgotten about.
 
@@ -72,15 +72,21 @@ SparkClean pays special attention to the kind of junk that piles up on a develop
 
 - **Disk Usage Overview** - Visual breakdown of your disk space with reclaimable space highlighted.
 
+- **WhatsApp Storage** - Shows the complete on-disk WhatsApp footprint. Cache and logs are separated from chat media, and the full media store can be explicitly reviewed and moved to Trash without deleting the message database.
+
 - **Export Reports** - Generate summary or detailed audit reports of scan results.
 
 - **Configurable Thresholds** - Adjust what counts as "old," "large," or "unused."
 
 ## How Cleanup Works
 
-SparkClean moves files to the Trash by default. Nothing gets permanently deleted right away, so you can always recover something if needed. You'll need to empty the Trash yourself when you're ready.
+SparkClean moves files to the Trash by default and records successful moves for Restore Last Cleanup. It reports Trash failures instead of silently falling back to permanent deletion. You'll need to empty the Trash yourself when you're ready.
 
-The exceptions are Docker and Ollama. Docker containers, images, and volumes are removed using Docker's own CLI commands, and Ollama models are deleted through the Ollama CLI. These are removed natively, the same way you'd do it from the terminal.
+The latest cleanup scan is also written to `~/Library/Logs/SparkClean/latest-scan.json`
+so category sizes and paths can be audited after SparkClean closes. This private local
+file is replaced by the next scan.
+
+The exceptions are Docker and Ollama, items already inside Trash, plus Safe/Review categories when permanent-delete mode is explicitly enabled. Docker dangling images, stopped containers, and build cache are removed using Docker's own CLI commands, and Ollama models are deleted through the Ollama CLI. Caution categories always go to the Trash.
 
 ## Full Disk Access
 
@@ -88,7 +94,7 @@ SparkClean needs Full Disk Access to scan folders that macOS restricts by defaul
 
 ## Privacy
 
-SparkClean runs entirely on your machine. There are no servers, no accounts, no analytics, and no network requests. Nothing leaves your computer. The app doesn't collect, store, or transmit any data about you or your files. Your scan results stay local and are never shared with anyone. The source code is open so you can verify all of this yourself.
+Cleanup and analysis run entirely on your Mac. There are no SparkClean accounts, analytics, telemetry, or uploaded scan results. Settings, size history, undo manifests, and deletion audit logs remain local; undo/audit records can contain file paths. The optional update checker contacts GitHub only when you request a check or enable automatic update checks, and downloads a release only to a location you choose.
 
 ## Requirements
 

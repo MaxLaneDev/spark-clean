@@ -31,6 +31,22 @@ Scopes: `app`, `ui`, `cleanup`, `uninstaller`, `settings`, `models`, `dashboard`
 - Keep functions focused and small
 - No external dependencies (pure Swift only)
 
+## Adding a Translation
+
+SparkClean uses `SparkClean/Localizable.xcstrings`, the Xcode String Catalog format.
+To contribute a language:
+
+1. Open `SparkClean.xcodeproj` in Xcode.
+2. Select `Localizable.xcstrings`, choose **Editor → Add Language**, and select the language.
+3. Translate user-facing entries without changing file paths, bundle identifiers,
+   command names, or audit-log text.
+4. Run the app with that language and check the sidebar, confirmation sheets, and
+   Settings at the minimum window size.
+5. Submit one language per pull request so native speakers can review it independently.
+
+The source language is English. Priority community translations are Spanish, German,
+French, Japanese, Simplified Chinese, and Portuguese.
+
 ## Reporting Bugs
 
 Open an [issue](https://github.com/georgekhananaev/spark-clean/issues) with:

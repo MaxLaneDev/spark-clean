@@ -32,3 +32,36 @@ SparkClean is built with SwiftUI and targets macOS 14.0+. It should work on any 
 - Full Disk Access is required for complete scan coverage.
 - Docker cleanup features require Docker Desktop to be installed.
 - Ollama cleanup features require Ollama to be installed.
+
+## Cleanup Coverage
+
+SparkClean currently covers system and application caches, logs, reviewable stale
+files directly inside sanctioned temporary folders, browser caches and opt-in privacy
+data, Xcode and developer-tool artifacts, package-manager caches, old downloads and
+installers, large files, unused applications, Docker resources, Ollama models, app
+leftovers, broken symbolic links, Next.js build output, and Rust/Node/Python project
+artifacts (including node_modules inside agent worktrees). Coverage is
+filesystem- and installation-dependent, so an empty category does not mean the
+related application is unsupported.
+
+Storage Insights separately measures high-value stores such as chat histories, Photos,
+Mail, iOS backups, iCloud Drive, simulators, Docker, and virtual machines. The Insights
+view remains read-only. WhatsApp is also exposed as explicit cleanup categories:
+generated cache, diagnostic logs, and the complete local chat-media store. Chat media
+is Caution-level, off by default, blocked while WhatsApp is running, and moved to Trash
+only after a separate confirmation.
+
+## Deliberate Safety Exclusions
+
+- SparkClean never cleans `~/Library/CloudStorage` or `~/Library/Mobile Documents`.
+- It does not descend into Photos, Music, Final Cut, Logic, GarageBand, sparse-bundle,
+  signed application, framework, or other package interiors.
+- Mounted volumes and iCloud/file-provider items are rejected again at delete time.
+- Broad direct-home targets, protected credential/account stores, and resolved
+  `/private` system paths are denied; only explicitly reviewed shell-history files and
+  sanctioned temporary-file locations have narrow exceptions.
+- Browser/privacy databases are not cleaned while their owning application is running.
+- Time Machine data is managed only through `tmutil`; backup folders are never removed
+  with filesystem APIs.
+- Similar images are suggestions, not exact duplicates. They are excluded from
+  Select All and require individual review.

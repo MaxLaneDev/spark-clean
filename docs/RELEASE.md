@@ -1,13 +1,18 @@
 # Release, Signing & Distribution (F3)
 
-This documents the steps that require your Apple Developer credentials and Xcode GUI
-actions — they can't be scripted headlessly here. Everything else (CI tests, cask
-formula) is already in the repo.
+This documents the steps that require your Apple Developer credentials and release
+decisions. CI and a cask template are in the repository, but the cask is not
+publishable until it has the final version, artifact URL, and SHA-256.
 
 ## 1. Developer ID signing + notarization (required for distribution & Homebrew)
 
 Prerequisites: Apple Developer Program membership, a **Developer ID Application**
 certificate installed in your keychain.
+
+The app target's Release configuration already enables Hardened Runtime and disables
+injected debug base entitlements. Before packaging, verify the exported app still
+reports the `runtime` code-sign flag, contains the Apple Events entitlement needed by
+approved administrator actions, and does not contain `get-task-allow`.
 
 ```bash
 # Archive a Release build (or use Xcode → Product → Archive).
@@ -53,6 +58,7 @@ After adding it:
 
 The cask formula is at `HomebrewFormula/spark-clean.rb`. Per release:
 1. Update `version` and set the real `sha256` (`shasum -a 256 SparkClean-<version>.dmg`).
+   Never publish the template's `sha256 :no_check`.
 2. Test locally: `brew install --cask ./HomebrewFormula/spark-clean.rb`.
 3. Publish via a self-hosted tap (`georgekhananaev/homebrew-tap`) for immediate
    availability, or submit a PR to `Homebrew/homebrew-cask` once the project has enough
