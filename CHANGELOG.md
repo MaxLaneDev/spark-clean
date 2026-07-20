@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [1.4.0] - 2026-07-20
+
+### Added
 - **feature**: **Disk Map** — accounts for the complete startup APFS container instead of presenting cleanup candidates as whole-disk usage. It separates the Data volume, user/home/Library folders, macOS support volumes, readable file totals, and a truthful protected/APFS-managed residual; the latest bounded audit is saved to `~/Library/Logs/SparkClean/latest-storage-map.json`.
 - **feature**: **Time Machine** sidebar section — lists APFS local snapshots with guarded multi-select deletion via `tmutil` (admin-escalated, injection-guarded). The newest snapshot is kept as a restore point and no speculative reclaim amount is shown.
 - **feature**: **Storage Insights** sidebar section — a read-only view of stores that grow silently but usually shouldn't be bulk-deleted (messaging apps, iOS backups, Photos, Mail, iCloud Drive, Downloads, Docker, simulators, and virtual machines). Shows current size, change since the prior measurement, partial-scan state, and a Full-Disk-Access badge when a store is unreadable. Measurement is cancellable and bounded by a deadline/watchdog; incomplete results are never written to history.
@@ -23,6 +31,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **safety/undo**: **Restore Last Cleanup** (⇧⌘Z, File menu) — cleanup, uninstall, duplicate removal, and Trash Monitor operations now record the Trash location of each item they remove, so the latest operation can be reversed. Restores skip items whose original location is re-occupied and tolerate items that have left the Trash.
 - **safety**: `FileRemover` — one deletion service now shared by the main clean pipeline, Uninstaller, Duplicate Finder, and Trash Monitor. Every item passes the same `DeletionPolicy` gate, delete-time existence/type/identity/cloud/volume checks, incremental undo recording, and bounded audit logging.
 - **safety**: Uninstaller gains a dedicated policy profile that permits removing whole `.app` bundles (never their interior) while keeping every other protection.
+- **safety**: `DeletionPolicy` — a single, testable set of rules deciding whether any path may be deleted, extracted from the former inline `isSafePath`. Now also rejects iCloud Drive / cloud-storage mounts (`~/Library/CloudStorage`, `~/Library/Mobile Documents`), the contents of signed `.app`/`.framework` bundles, library document bundles (`.photoslibrary`, `.musiclibrary`, `.fcpbundle`, `.logicx`, `.sparsebundle`, keychains), and launch-service directories (`LaunchDaemons`/`LaunchAgents`/`Extensions`). Home-injectable for testing.
+- **safety**: `allowedRoots` deletion territory — each scan category now confines deletion to the subtree(s) it legitimately owns. Every concrete deletion, including children discovered at delete time, must resolve to a path within that territory, so a scan bug or a symlink escaping into a sibling tree can no longer delete outside the category's declared paths.
+- **safety**: Delete-time guard skips any item that has become an iCloud/file-provider materialization since it was scanned (prevents corrupting cloud sync state).
+- **ci**: `Tests` GitHub Actions workflow running the unit suite on every push/PR to main.
+- **tests**: `DeletionPolicyTests` — 23 characterization/expansion/territory tests pinning the exact deletable/undeletable verdicts, including component-boundary matching (`/a/bc` is not within `/a/b`), a regression guard that Ruby's `~/.bundle/cache` stays deletable, and real-symlink escape tests (into a protected dir, and out of a category's territory).
+- **tests**: `BrokenSymlinkScanTests` covering broken/valid detection, excluded-dir skipping, cancellation, depth cap, and the iteration watchdog against isolated fixture trees.
+- **tests**: Regression coverage for empty deletion territories, delete-time type changes, consumed/retryable undo manifests, strict Time Machine dates/newest selection, bounded Storage Insights measurement, and fixture-based Electron cache discovery.
+- **tests**: Replaced the placeholder UI launch test with deterministic dashboard smoke assertions for the main window, title, and Scan action.
+
+### Changed
+- **release**: Release builds now enable Hardened Runtime, omit injected debug base entitlements, embed the Apple Events/admin and protected-folder purpose strings in the executable Info.plist, and produce a universal Apple Silicon + Intel binary from the generic macOS destination.
+- **safety**: `CleanupManager.isSafePath` delegates to the shared `DeletionPolicy`, and every filesystem deletion surface now uses that policy through `FileRemover`.
 
 ### Fixed
 - **permissions**: Full Disk Access detection now verifies that a protected directory can actually be enumerated instead of trusting POSIX readability bits, which can report a false positive while macOS privacy controls are still blocking the scan.
@@ -73,22 +93,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **maintenance**: Tasks now report command failures instead of unconditional success, and command execution drains stderr with stdout to prevent another pipe-buffer deadlock.
 - **startup-items**: Toggle completion now resolves rows by ID after a concurrent rescan, reports launchctl failures, disables in-flight switches, and labels system entries as installed/read-only instead of claiming they are active.
 - **updates**: Release metadata now requires a valid stable version and non-empty GitHub-hosted DMG. Downloads reject non-success responses and non-GitHub redirects, validate the UDIF trailer, and stage the complete image beside the destination before atomically replacing an existing file.
-
-### Added
-- **tests**: `BrokenSymlinkScanTests` covering broken/valid detection, excluded-dir skipping, cancellation, depth cap, and the iteration watchdog against isolated fixture trees.
-- **tests**: Replaced the placeholder UI launch test with deterministic dashboard smoke assertions for the main window, title, and Scan action.
-- **safety**: `DeletionPolicy` — a single, testable set of rules deciding whether any path may be deleted, extracted from the former inline `isSafePath`. Now also rejects iCloud Drive / cloud-storage mounts (`~/Library/CloudStorage`, `~/Library/Mobile Documents`), the contents of signed `.app`/`.framework` bundles, library document bundles (`.photoslibrary`, `.musiclibrary`, `.fcpbundle`, `.logicx`, `.sparsebundle`, keychains), and launch-service directories (`LaunchDaemons`/`LaunchAgents`/`Extensions`). Home-injectable for testing.
-- **safety**: `allowedRoots` deletion territory — each scan category now confines deletion to the subtree(s) it legitimately owns. Every concrete deletion, including children discovered at delete time, must resolve to a path within that territory, so a scan bug or a symlink escaping into a sibling tree can no longer delete outside the category's declared paths.
-- **safety**: Delete-time guard skips any item that has become an iCloud/file-provider materialization since it was scanned (prevents corrupting cloud sync state).
-- **ci**: `Tests` GitHub Actions workflow running the unit suite on every push/PR to main.
-- **tests**: `DeletionPolicyTests` — 23 characterization/expansion/territory tests pinning the exact deletable/undeletable verdicts, including component-boundary matching (`/a/bc` is not within `/a/b`), a regression guard that Ruby's `~/.bundle/cache` stays deletable, and real-symlink escape tests (into a protected dir, and out of a category's territory).
-- **tests**: Regression coverage for empty deletion territories, delete-time type changes, consumed/retryable undo manifests, strict Time Machine dates/newest selection, bounded Storage Insights measurement, and fixture-based Electron cache discovery.
-
-### Changed
-- **release**: Release builds now enable Hardened Runtime, omit injected debug base entitlements, embed the Apple Events/admin and protected-folder purpose strings in the executable Info.plist, and produce a universal Apple Silicon + Intel binary from the generic macOS destination.
-- **safety**: `CleanupManager.isSafePath` delegates to the shared `DeletionPolicy`, and every filesystem deletion surface now uses that policy through `FileRemover`.
-
-### Fixed
 - **tests**: Repaired the unit-test target, which did not compile on `main` — a stale `PathStat.id.uuidString` reference (id is now a `String`), plus drifted assertions in `CategoryGroupTests.allCasesExist` (6→9 groups) and `exportReport` (group headers are uppercased).
 
 ## [1.3.0] - 2026-04-02

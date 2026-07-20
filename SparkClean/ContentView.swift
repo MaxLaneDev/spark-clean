@@ -1412,6 +1412,18 @@ struct WhatsNewView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let releases: [ReleaseNote] = [
+        ReleaseNote(version: "1.4.0", date: "July 2026", notes: [
+            "New Disk Map — accounts for the whole startup volume instead of showing cleanup results as total disk usage",
+            "New Storage Insights — read-only sizes and trends for chat apps, Photos, Mail, iOS backups, simulators, and VMs",
+            "New Time Machine section — review and delete APFS local snapshots, with the newest kept as a restore point",
+            "WhatsApp storage — see the full media footprint and clear it explicitly, without touching your message database",
+            "Restore Last Cleanup (⇧⌘Z) now covers cleanup, uninstall, duplicates, and Trash Monitor",
+            "Every deletion path now goes through one shared safety policy with delete-time re-validation",
+            "APFS clones are no longer counted twice, so reported sizes match real reclaimable space",
+            "Per-category Scan button, plus new Next.js, Rust, Electron, installer, and dev-tool cache scans",
+            "Optional menu bar icon with Open, Scan Now, and Open Trash quick actions",
+            "Many accuracy fixes: cleanup results, Docker prune reporting, duplicate detection, and maintenance tasks",
+        ]),
         ReleaseNote(version: "1.3.0", date: "April 2026", notes: [
             "New Privacy category — scan and clean Recent Items, Spotlight History, Shell History, Safari/Chrome/Firefox browsing data, and cookies",
             "Admin privilege escalation — clean root-owned files, uninstall system apps (e.g., Microsoft Office), and Trash Monitor cleanup",
