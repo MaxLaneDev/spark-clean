@@ -23,6 +23,16 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5E3B05122F5A464E00543812 /* Exceptions for "SparkClean" folder in "SparkClean" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5E3B04E72F5A464D00543812 /* SparkClean */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileReference section */
 		5E3B04E82F5A464D00543812 /* SparkClean.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SparkClean.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E3B04F52F5A464E00543812 /* SparkCleanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SparkCleanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -32,6 +42,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5E3B04EA2F5A464D00543812 /* SparkClean */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5E3B05122F5A464E00543812 /* Exceptions for "SparkClean" folder in "SparkClean" target */,
+			);
 			path = SparkClean;
 			sourceTree = "<group>";
 		};
@@ -388,14 +401,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SparkClean/SparkClean.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = SparkClean;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SparkClean/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -433,14 +446,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SparkClean/SparkClean.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = SparkClean;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SparkClean/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

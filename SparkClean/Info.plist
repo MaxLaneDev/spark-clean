@@ -2,11 +2,35 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>SparkClean</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>SparkClean uses Apple Events only when you approve an administrator-privileged cleanup or maintenance action.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>SparkClean scans your Desktop for old screenshots to help reclaim disk space.</string>
-	<key>NSDownloadsFolderUsageDescription</key>
-	<string>SparkClean scans your Downloads folder for old files and installers to help reclaim disk space.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>SparkClean scans your Documents folder for old screenshots to help reclaim disk space.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>SparkClean scans your Downloads folder for old files and installers to help reclaim disk space.</string>
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>SparkClean requests administrator approval only for cleanup or maintenance actions that you explicitly confirm.</string>
 </dict>
 </plist>
