@@ -26,6 +26,10 @@ struct CategoryGroupDetailView: View {
         groupCategories.filter(\.isSelected).reduce(0) { $0 + $1.selectedSize }
     }
 
+    private var hasSelectedContent: Bool {
+        groupCategories.contains { $0.isSelected && $0.hasSelectedContent }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
@@ -34,7 +38,7 @@ struct CategoryGroupDetailView: View {
                     .foregroundStyle(group.color)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(group.rawValue)
+                    Text(group.displayName)
                         .font(.title3)
                         .fontWeight(.bold)
                     Text("\(groupCategories.count) categories · \(CleanupManager.formatBytes(groupSize)) total")
@@ -70,58 +74,89 @@ struct CategoryGroupDetailView: View {
 
             Divider()
 
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(groupCategories) { category in
-                        CategoryRowView(
-                            categoryID: category.id,
-                            isSelected: Binding(
-                                get: { manager.categories.first(where: { $0.id == category.id })?.isSelected ?? false },
-                                set: { newValue in
-                                    if let idx = manager.categories.firstIndex(where: { $0.id == category.id }) {
-                                        manager.categories[idx].isSelected = newValue
-                                    }
-                                }
-                            ),
-                            manager: manager
-                        )
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-            }
+            if groupCategories.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
 
-            Divider()
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 34))
+                        .foregroundStyle(group.color)
 
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Selected: \(CleanupManager.formatBytes(selectedSize))")
-                        .font(.system(size: 12, weight: .medium))
-                    Text("\(groupCategories.filter(\.isSelected).count) of \(groupCategories.count) categories")
-                        .font(.caption2)
+                    Text("Nothing scanned yet")
+                        .font(.headline)
+
+                    Text("Scan this category to find files that can be reviewed and cleaned.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                }
+                        .multilineTextAlignment(.center)
 
-                Spacer()
-
-                Button {
-                    showCleanAlert = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("Clean Selected")
-                            .font(.system(size: 12, weight: .semibold))
+                    Button {
+                        Task { await manager.scan(onlyGroup: group) }
+                    } label: {
+                        Label("Scan \(group.displayName)", systemImage: "magnifyingglass")
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(manager.isScanning)
+
+                    Spacer()
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                .disabled(manager.isScanning || manager.isCleaning || selectedSize == 0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(32)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(groupCategories) { category in
+                            CategoryRowView(
+                                categoryID: category.id,
+                                isSelected: Binding(
+                                    get: { manager.categories.first(where: { $0.id == category.id })?.isSelected ?? false },
+                                    set: { newValue in
+                                        if let idx = manager.categories.firstIndex(where: { $0.id == category.id }) {
+                                            manager.categories[idx].isSelected = newValue
+                                        }
+                                    }
+                                ),
+                                manager: manager
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                }
+
+                Divider()
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Selected: \(CleanupManager.formatBytes(selectedSize))")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("\(groupCategories.filter(\.isSelected).count) of \(groupCategories.count) categories")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        manager.pendingCleanGroup = group
+                        showCleanAlert = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("Clean Selected")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(manager.isScanning || manager.isCleaning || !hasSelectedContent)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
         }
     }
 }
@@ -184,7 +219,7 @@ struct CategoryRowView: View {
             HStack(spacing: 3) {
                 Image(systemName: category.safetyLevel.icon)
                     .font(.system(size: 9))
-                Text(category.safetyLevel.rawValue)
+                Text(category.safetyLevel.displayName)
                     .font(.system(size: 10, weight: .medium))
             }
             .foregroundStyle(category.safetyLevel.color)
@@ -195,7 +230,7 @@ struct CategoryRowView: View {
                     .fill(category.safetyLevel.color.opacity(0.12))
             )
             .help(safetyTooltip(category.safetyLevel))
-            .accessibilityLabel("Safety level: \(category.safetyLevel.rawValue)")
+            .accessibilityLabel("Safety level: \(category.safetyLevel.displayName)")
 
             if category.isDockerResource {
                 Image(systemName: "cube.box")
@@ -236,12 +271,12 @@ struct CategoryRowView: View {
         .opacity(isSelected ? 1.0 : 0.55)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(category.name), \(CleanupManager.formatBytes(category.selectedSize)), \(category.safetyLevel.rawValue)")
+        .accessibilityLabel("\(category.name), \(CleanupManager.formatBytes(category.selectedSize)), \(category.safetyLevel.displayName)")
     }
 
     private func safetyTooltip(_ level: SafetyLevel) -> String {
         switch level {
-        case .safe: "Safe to delete — caches and temp files that rebuild automatically. No risk of data loss."
+        case .safe: "Low-risk cleanup — caches, logs, and generated files that are expected to rebuild automatically."
         case .review: "Review before deleting — user files that may be wanted. Check the contents first."
         case .caution: "Use caution — app data or system files that could affect running applications."
         }
@@ -253,7 +288,6 @@ struct CategoryRowView: View {
 struct PathBreakdownView: View {
     let categoryID: UUID
     @Bindable var manager: CleanupManager
-    @State private var deletingModels: Set<String> = []
 
     private var category: CleanupCategory {
         manager.categories.first(where: { $0.id == categoryID }) ?? CleanupCategory(
@@ -283,6 +317,21 @@ struct PathBreakdownView: View {
                 Text(category.description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if let warning = category.cleanupWarning, !warning.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.octagon.fill")
+                        .foregroundStyle(.red)
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.red.opacity(0.08))
+                )
             }
 
             if hasPerFileSelection {
@@ -363,22 +412,9 @@ struct PathBreakdownView: View {
                                 }
 
                                 if category.isOllamaResource {
-                                    if deletingModels.contains(stat.path) {
-                                        HStack(spacing: 4) {
-                                            ProgressView()
-                                                .controlSize(.small)
-                                            Text("Removing…")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    } else {
-                                        Button("Delete") {
-                                            deleteOllamaModel(stat.path, at: idx)
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
-                                        .tint(.red)
-                                    }
+                                    Text("Use Clean Selected")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                 } else if !category.isDockerResource {
                                     Button("Reveal") {
                                         let path = stat.path
@@ -447,33 +483,6 @@ struct PathBreakdownView: View {
         }
     }
 
-    private func deleteOllamaModel(_ modelName: String, at index: Int) {
-        guard let ollamaPath = CleanupManager.findOllama() else { return }
-        deletingModels.insert(modelName)
-        DispatchQueue.global(qos: .userInitiated).async {
-            _ = CleanupManager.runCommand(ollamaPath, arguments: ["rm", modelName])
-            DispatchQueue.main.async {
-                deletingModels.remove(modelName)
-                guard let catIdx = manager.categories.firstIndex(where: { $0.id == categoryID }) else { return }
-                // Find by model name instead of index to avoid race condition
-                guard let breakdownIdx = manager.categories[catIdx].breakdown.firstIndex(where: { $0.path == modelName }) else { return }
-                let removedSize = manager.categories[catIdx].breakdown[breakdownIdx].size
-                manager.categories[catIdx].breakdown.remove(at: breakdownIdx)
-                manager.categories[catIdx].size -= removedSize
-                manager.categories[catIdx].fileCount -= 1
-                // Update description to reflect remaining models
-                let remaining = manager.categories[catIdx].breakdown.count
-                if remaining == 0 {
-                    manager.categories[catIdx].size = 0
-                    manager.categories[catIdx].fileCount = 0
-                    manager.categories[catIdx].description = "No models installed"
-                } else {
-                    let totalSize = manager.categories[catIdx].breakdown.reduce(0) { $0 + $1.size }
-                    manager.categories[catIdx].description = "\(remaining) model\(remaining == 1 ? "" : "s") installed — \(CleanupManager.formatBytes(totalSize))"
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Export Report View

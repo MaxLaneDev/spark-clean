@@ -32,7 +32,7 @@ final class TrashMonitor {
     private let knownAppsLock = OSAllocatedUnfairLock(initialState: Set<String>())
     private let scanQueue = DispatchQueue(label: "gk.SparkClean.trashMonitor", qos: .utility)
 
-    struct DetectedTrashedApp: Identifiable {
+    nonisolated struct DetectedTrashedApp: Identifiable, Sendable {
         let id = UUID()
         let appName: String
         let bundleID: String
@@ -40,15 +40,17 @@ final class TrashMonitor {
         let leftovers: [LeftoverItem]
         let totalSize: Int64
 
-        var formattedSize: String {
+        @MainActor var formattedSize: String {
             CleanupManager.formatBytes(totalSize)
         }
     }
 
-    struct LeftoverItem {
+    nonisolated struct LeftoverItem: Sendable {
         let path: String
         let category: String
         let size: Int64
+        let isDirectory: Bool
+        let fileIdentity: FileRemover.FileIdentity?
     }
 
     // MARK: - Lifecycle
@@ -128,6 +130,14 @@ final class TrashMonitor {
     private func scanLeftovers(for trashedAppPath: String) {
         let fm = FileManager.default
         let home = NSHomeDirectory()
+        let trashedURL = URL(fileURLWithPath: trashedAppPath)
+        guard let appValues = try? trashedURL.resourceValues(forKeys: [
+                  .isDirectoryKey, .isSymbolicLinkKey, .isPackageKey,
+              ]),
+              appValues.isDirectory == true,
+              appValues.isSymbolicLink != true,
+              appValues.isPackage == true
+        else { return }
 
         // Extract app info from the trashed bundle
         let appName = ((trashedAppPath as NSString).lastPathComponent as NSString).deletingPathExtension
@@ -158,35 +168,32 @@ final class TrashMonitor {
             }
             // Also check by app name
             c.append(("\(home)/Library/Application Support/\(appName)", "App Support"))
-            c.append(("\(home)/Library/Caches/\(appName)", "Caches"))
-            c.append(("\(home)/Library/Logs/\(appName)", "Logs"))
+            c.append((
+                "\(home)/Library/Caches/\(appName)",
+                "Possible App Data — Cache name match"
+            ))
+            c.append((
+                "\(home)/Library/Logs/\(appName)",
+                "Possible App Data — Log name match"
+            ))
             return c
         }()
 
-        // Check LaunchAgents
-        let launchAgentDirs = [
-            "\(home)/Library/LaunchAgents",
-            "/Library/LaunchAgents"
-        ]
-
-        for dir in launchAgentDirs {
-            if let entries = try? fm.contentsOfDirectory(atPath: dir) {
-                for entry in entries where entry.hasSuffix(".plist") {
-                    let matches = (!bundleID.isEmpty && entry.contains(bundleID)) ||
-                                  entry.lowercased().contains(appName.lowercased())
-                    if matches {
-                        let path = (dir as NSString).appendingPathComponent(entry)
-                        let size = (try? fm.attributesOfItem(atPath: path))?[.size] as? Int64 ?? 0
-                        leftovers.append(LeftoverItem(path: path, category: "Launch Agent", size: size))
-                        totalSize += size
-                    }
-                }
-            }
-        }
-
         var seen = Set<String>()
+        let policy = DeletionPolicy(home: home)
         for (path, category) in candidates {
             guard fm.fileExists(atPath: path) else { continue }
+            guard policy.isStableAllowedRoot(path),
+                  policy.validate(path, allowedRoots: [path]),
+                  let values = try? URL(fileURLWithPath: path)
+                      .resourceValues(forKeys: [
+                          .isSymbolicLinkKey, .isUbiquitousItemKey,
+                          .isVolumeKey,
+                      ]),
+                  values.isSymbolicLink != true,
+                  values.isUbiquitousItem != true,
+                  values.isVolume != true
+            else { continue }
             let resolved = (path as NSString).resolvingSymlinksInPath
             guard !seen.contains(resolved) else { continue }
             seen.insert(resolved)
@@ -200,7 +207,13 @@ final class TrashMonitor {
                     size = (try? fm.attributesOfItem(atPath: path))?[.size] as? Int64 ?? 0
                 }
                 if size > 0 {
-                    leftovers.append(LeftoverItem(path: path, category: category, size: size))
+                    leftovers.append(LeftoverItem(
+                        path: path,
+                        category: category,
+                        size: size,
+                        isDirectory: isDir.boolValue,
+                        fileIdentity: FileRemover.fileIdentity(at: path)
+                    ))
                     totalSize += size
                 }
             }
@@ -227,9 +240,21 @@ final class TrashMonitor {
     /// Quick directory size — caps at 10,000 files to stay fast
     private func quickDirSize(_ path: String) -> Int64 {
         let fm = FileManager.default
+        guard let rootValues = try? URL(fileURLWithPath: path)
+            .resourceValues(forKeys: [
+                .isSymbolicLinkKey, .isUbiquitousItemKey, .isVolumeKey,
+            ]),
+            rootValues.isSymbolicLink != true,
+            rootValues.isUbiquitousItem != true,
+            rootValues.isVolume != true
+        else { return 0 }
+        let keys: Set<URLResourceKey> = [
+            .totalFileAllocatedSizeKey, .isRegularFileKey,
+            .isSymbolicLinkKey, .isUbiquitousItemKey,
+        ]
         guard let enumerator = fm.enumerator(
             at: URL(fileURLWithPath: path),
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey],
+            includingPropertiesForKeys: Array(keys),
             options: [],
             errorHandler: nil
         ) else { return 0 }
@@ -241,11 +266,13 @@ final class TrashMonitor {
         while let obj = enumerator.nextObject() {
             guard let url = obj as? URL else { continue }
             autoreleasepool {
-                guard let rv = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]) else { return }
-                if rv.isRegularFile == true {
-                    total += Int64(rv.totalFileAllocatedSize ?? 0)
-                    count += 1
-                }
+                guard let rv = try? url.resourceValues(forKeys: keys),
+                      rv.isRegularFile == true,
+                      rv.isSymbolicLink != true,
+                      rv.isUbiquitousItem != true
+                else { return }
+                total += Int64(rv.totalFileAllocatedSize ?? 0)
+                count += 1
             }
             if count >= maxFiles { break }
         }

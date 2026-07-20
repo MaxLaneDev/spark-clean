@@ -23,6 +23,21 @@ enum CategoryGroup: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    /// Localized display text. `rawValue` remains a stable Codable/identity key.
+    var displayName: String {
+        switch self {
+        case .system: String(localized: "System")
+        case .storage: String(localized: "Storage")
+        case .browsers: String(localized: "Browsers")
+        case .developer: String(localized: "Developer Tools")
+        case .packageManagers: String(localized: "Package Managers")
+        case .largeFiles: String(localized: "Large Files")
+        case .privacy: String(localized: "Privacy")
+        case .docker: String(localized: "Docker")
+        case .applications: String(localized: "Applications")
+        }
+    }
+
     var icon: String {
         switch self {
         case .system: "gearshape.2"
@@ -77,9 +92,17 @@ enum SafetyLevel: String, Codable {
 
     var label: String {
         switch self {
-        case .safe: "Safe to delete"
-        case .review: "Review before deleting"
-        case .caution: "Use caution"
+        case .safe: String(localized: "Safe to delete")
+        case .review: String(localized: "Review before deleting")
+        case .caution: String(localized: "Use caution")
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .safe: String(localized: "Safe")
+        case .review: String(localized: "Review")
+        case .caution: String(localized: "Caution")
         }
     }
 }
@@ -94,10 +117,7 @@ enum ScanConstants {
     static let minSystemCacheTotalBytes: Int64 = 1_000_000 // 1MB
     static let installerFileAgeDays = 14
     static let secondsPerDay: Double = 86400
-    static let maxBreakdownEntries = 60
-    static let maxNodeModulesEntries = 50
     static let minVenvSizeBytes: Int64 = 50_000_000  // 50MB
-    static let maxVenvEntries = 50
     static let minDuplicateSizeBytes: Int64 = 1_000_000  // 1MB
     static let maxDuplicateFileSize: Int64 = 2_147_483_648  // 2GB
 }
@@ -109,10 +129,32 @@ struct PathStat: Identifiable {
     let path: String
     let size: Int64
     let fileCount: Int
+    let fileIdentity: FileRemover.FileIdentity?
     var children: [PathStat] = []
     var lastAccessed: Date? = nil
     var isSelected: Bool = true
     var displayName: String? = nil
+
+    init(
+        path: String,
+        size: Int64,
+        fileCount: Int,
+        children: [PathStat] = [],
+        lastAccessed: Date? = nil,
+        isSelected: Bool = true,
+        displayName: String? = nil,
+        fileIdentity: FileRemover.FileIdentity? = nil
+    ) {
+        self.path = path
+        self.size = size
+        self.fileCount = fileCount
+        self.fileIdentity = fileIdentity ??
+            (path.hasPrefix("/") ? FileRemover.fileIdentity(at: path) : nil)
+        self.children = children
+        self.lastAccessed = lastAccessed
+        self.isSelected = isSelected
+        self.displayName = displayName
+    }
 }
 
 struct CleanupCategory: Identifiable, Equatable {
@@ -125,6 +167,10 @@ struct CleanupCategory: Identifiable, Equatable {
     let icon: String
     let color: Color
     var description: String
+    /// A category-specific consequence that must be shown again at final
+    /// confirmation. This is intentionally separate from the short list-row
+    /// description so destructive app-data cleanup cannot be hidden by truncation.
+    var cleanupWarning: String? = nil
     let group: CategoryGroup
     let safetyLevel: SafetyLevel
     var paths: [String]
@@ -134,8 +180,32 @@ struct CleanupCategory: Identifiable, Equatable {
     /// `DeletionPolicy.validate`. This bounds a category to its declared territory so a
     /// scan bug can never delete outside it.
     var allowedRoots: [String] = []
+    /// Nested targets owned by another scan definition. They are excluded from both
+    /// measurement and delete-time parent enumeration to prevent hidden/double cleanup.
+    var excludedPaths: [String] = []
+    /// Applications that should be closed before this category is cleaned. Privacy
+    /// categories are hard-blocked while an associated app is running; other
+    /// categories are skipped with an actionable error instead of risking live data.
+    var associatedBundleIDs: [String] = []
+    /// Only categories that explicitly represent whole application bundles may use
+    /// the Uninstaller deletion-policy profile.
+    var allowsApplicationBundles: Bool = false
+    /// Only categories that explicitly target direct children of the current home
+    /// directory (currently Shell History) may use this deletion-policy profile.
+    var allowsDirectHomeItems: Bool = false
+    /// Broken-link cleanup removes the symlink object, not its missing target. Only
+    /// that scanner may validate the final path component lexically while still
+    /// resolving every parent component and enforcing stable traversal roots.
+    var allowsSymbolicLinkItems: Bool = false
+    /// Items that are already in Trash cannot be moved to Trash again. Categories with
+    /// this flag use explicit permanent deletion and must be shown as irreversible.
+    var requiresPermanentDeletion: Bool = false
     var breakdown: [PathStat] = []
     var deleteChildrenOnly: Bool = true
+    /// Some caution categories intentionally expose one all-or-nothing managed store.
+    /// Their breakdown is informational and must not switch cleanup into per-entry
+    /// reconciliation semantics.
+    var allowsBreakdownSelection: Bool = true
     var isDockerResource: Bool = false
     var dockerCleanCommand: [String]? = nil
     var isOllamaResource: Bool = false
@@ -148,11 +218,19 @@ struct CleanupCategory: Identifiable, Equatable {
     var selectedFileCount: Int {
         breakdown.isEmpty ? fileCount : breakdown.filter(\.isSelected).reduce(0) { $0 + $1.fileCount }
     }
+    var hasSelectedContent: Bool {
+        selectedSize > 0 || selectedFileCount > 0
+    }
     var selectedPaths: [String] {
         breakdown.isEmpty ? paths : breakdown.filter(\.isSelected).map(\.path)
     }
     var hasPerFileSelection: Bool {
-        !breakdown.isEmpty && (safetyLevel == .review || safetyLevel == .caution)
+        // Docker prune commands cannot honor per-resource choices. Ollama can
+        // (`ollama rm <model>`) and therefore keeps its per-model checkboxes.
+        !isDockerResource &&
+            allowsBreakdownSelection &&
+            !breakdown.isEmpty &&
+            (safetyLevel == .review || safetyLevel == .caution)
     }
     var exists: Bool = true
 }
@@ -162,21 +240,36 @@ struct ScanDefinition {
     let icon: String
     let color: Color
     let description: String
+    let cleanupWarning: String?
     let group: CategoryGroup
     let safetyLevel: SafetyLevel
+    let associatedBundleIDs: [String]
+    let requiresPermanentDeletion: Bool
+    let allowsDirectHomeItems: Bool
+    let allowsBreakdownSelection: Bool
     let pathResolver: () -> [String]
     let defaultSelected: Bool
 
     init(
-        name: String, icon: String, color: Color,
-        description: String, group: CategoryGroup,
+        name: String.LocalizationValue, icon: String, color: Color,
+        description: String.LocalizationValue, group: CategoryGroup,
         safetyLevel: SafetyLevel = .safe,
         defaultSelected: Bool = true,
+        cleanupWarning: String.LocalizationValue? = nil,
+        associatedBundleIDs: [String] = [],
+        requiresPermanentDeletion: Bool = false,
+        allowsDirectHomeItems: Bool = false,
+        allowsBreakdownSelection: Bool = true,
         pathResolver: @escaping () -> [String]
     ) {
-        self.name = name; self.icon = icon; self.color = color
-        self.description = description; self.group = group
+        self.name = String(localized: name); self.icon = icon; self.color = color
+        self.description = String(localized: description); self.group = group
+        self.cleanupWarning = cleanupWarning.map { String(localized: $0) }
         self.safetyLevel = safetyLevel
+        self.associatedBundleIDs = associatedBundleIDs
+        self.requiresPermanentDeletion = requiresPermanentDeletion
+        self.allowsDirectHomeItems = allowsDirectHomeItems
+        self.allowsBreakdownSelection = allowsBreakdownSelection
         self.defaultSelected = defaultSelected
         self.pathResolver = pathResolver
     }
@@ -213,6 +306,7 @@ enum SidebarItem: Hashable {
     case maintenance
     case startupManager
     case timeMachine
+    case diskMap
     case storageInsights
 }
 
@@ -231,6 +325,7 @@ struct AppInfo: Identifiable, Equatable {
     var appSize: Int64 = 0
     var relatedPaths: [RelatedPath] = []
     var totalRelatedSize: Int64 = 0
+    var fileIdentity: FileRemover.FileIdentity? = nil
 
     var totalSize: Int64 {
         appSize + totalRelatedSize
@@ -243,7 +338,24 @@ struct RelatedPath: Identifiable {
     let category: String
     let size: Int64
     let fileCount: Int
+    let fileIdentity: FileRemover.FileIdentity?
     var isSelected: Bool = true
+
+    init(
+        path: String,
+        category: String,
+        size: Int64,
+        fileCount: Int,
+        fileIdentity: FileRemover.FileIdentity? = nil,
+        isSelected: Bool = true
+    ) {
+        self.path = path
+        self.category = category
+        self.size = size
+        self.fileCount = fileCount
+        self.fileIdentity = fileIdentity ?? FileRemover.fileIdentity(at: path)
+        self.isSelected = isSelected
+    }
 }
 
 // MARK: - Sidebar Items

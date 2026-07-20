@@ -38,6 +38,8 @@ final class UpdateChecker {
             isChecking = true
             errorMessage = nil
             checkCompleted = false
+            latestVersion = nil
+            downloadURL = nil
         }
 
         do {
@@ -54,17 +56,31 @@ final class UpdateChecker {
 
             let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
             let version = release.tagName.hasPrefix("v") ? String(release.tagName.dropFirst()) : release.tagName
-            let dmgAsset = release.assets.first { $0.name.hasSuffix(".dmg") }
+            guard version.range(
+                of: #"^[0-9]+(?:\.[0-9]+){1,3}$"#,
+                options: .regularExpression
+            ) != nil,
+            let dmgAsset = release.assets.first(where: {
+                let name = $0.name.lowercased()
+                return name.hasPrefix("sparkclean") &&
+                    name.hasSuffix(".dmg") &&
+                    $0.size > 0
+            }),
+            let validatedURL = Self.validatedGitHubDownloadURL(
+                dmgAsset.browserDownloadURL
+            ) else {
+                throw URLError(.badServerResponse)
+            }
 
             await MainActor.run {
                 latestVersion = version
-                downloadURL = dmgAsset.flatMap { URL(string: $0.browserDownloadURL) }
+                downloadURL = validatedURL
                 isChecking = false
                 checkCompleted = true
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Could not check for updates. Please check your internet connection."
+                errorMessage = "Could not verify the latest GitHub release. Check your connection and try again."
                 isChecking = false
                 checkCompleted = true
             }
@@ -83,20 +99,38 @@ final class UpdateChecker {
         isDownloading = true
         downloadProgress = 0
 
-        let task = URLSession.shared.downloadTask(with: url) { [weak self] tempURL, _, error in
+        let task = URLSession.shared.downloadTask(with: url) {
+            [weak self] tempURL, response, error in
             DispatchQueue.main.async {
                 self?.isDownloading = false
 
-                guard let tempURL, error == nil else {
+                guard let tempURL,
+                      error == nil,
+                      let response = response as? HTTPURLResponse,
+                      response.statusCode == 200,
+                      Self.isAllowedGitHubAssetURL(response.url),
+                      Self.isValidUDIFDiskImage(at: tempURL)
+                else {
                     self?.errorMessage = "Download failed. Please try again."
                     return
                 }
 
                 do {
+                    let fm = FileManager.default
+                    let stagingURL = saveURL.deletingLastPathComponent()
+                        .appendingPathComponent(
+                            ".\(saveURL.lastPathComponent).\(UUID().uuidString).download"
+                        )
+                    defer { try? fm.removeItem(at: stagingURL) }
+                    try fm.copyItem(at: tempURL, to: stagingURL)
                     if FileManager.default.fileExists(atPath: saveURL.path) {
-                        try FileManager.default.removeItem(at: saveURL)
+                        _ = try fm.replaceItemAt(
+                            saveURL,
+                            withItemAt: stagingURL
+                        )
+                    } else {
+                        try fm.moveItem(at: stagingURL, to: saveURL)
                     }
-                    try FileManager.default.moveItem(at: tempURL, to: saveURL)
                     NSWorkspace.shared.activateFileViewerSelecting([saveURL])
                 } catch {
                     self?.errorMessage = "Could not save the file."
@@ -112,6 +146,42 @@ final class UpdateChecker {
 
         downloadTask = task
         task.resume()
+    }
+
+    private static func validatedGitHubDownloadURL(_ value: String) -> URL? {
+        guard let url = URL(string: value),
+              url.scheme?.lowercased() == "https",
+              url.host?.lowercased() == "github.com" else {
+            return nil
+        }
+        return url
+    }
+
+    private static func isAllowedGitHubAssetURL(_ url: URL?) -> Bool {
+        guard let url,
+              url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased()
+        else { return false }
+        return host == "github.com" ||
+            host == "release-assets.githubusercontent.com" ||
+            host == "objects.githubusercontent.com"
+    }
+
+    /// UDIF disk images end with a 512-byte resource fork trailer beginning `koly`.
+    /// This rejects HTML/error payloads that happen to arrive with HTTP 200.
+    private static func isValidUDIFDiskImage(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return false
+        }
+        defer { try? handle.close() }
+        do {
+            let length = try handle.seekToEnd()
+            guard length >= 512 else { return false }
+            try handle.seek(toOffset: length - 512)
+            return try handle.read(upToCount: 4) == Data("koly".utf8)
+        } catch {
+            return false
+        }
     }
 
     private func compareVersions(_ a: String, isGreaterThan b: String) -> Bool {
@@ -162,12 +232,13 @@ struct SettingsView: View {
     @AppStorage("scanLargeFiles") private var scanLargeFiles = true
     @AppStorage("scanVirtualEnvironments") private var scanVirtualEnvironments = true
     @AppStorage("scanRustTargets") private var scanRustTargets = true
+    @AppStorage("scanOldInstallers") private var scanOldInstallers = true
     @AppStorage("screenRecordingThresholdDays") private var screenRecordingThresholdDays = 60
     @AppStorage("scanIOSBackups") private var scanIOSBackups = true
     @AppStorage("scanIMessageAttachments") private var scanIMessageAttachments = true
     @AppStorage("scanBrokenSymlinks") private var scanBrokenSymlinks = true
     @AppStorage("scanScreenRecordings") private var scanScreenRecordings = true
-@AppStorage("showIntroVideo") private var showIntroVideo = true
+    @AppStorage("showIntroVideo") private var showIntroVideo = true
     @AppStorage("trashMonitorEnabled") private var trashMonitorEnabled = false
     @AppStorage("checkUpdatesOnLaunch") private var checkUpdatesOnLaunch = false
     @AppStorage("showMenuBarExtra") private var showMenuBarExtra = false
@@ -257,6 +328,7 @@ struct SettingsView: View {
                 Toggle("Scan iMessage attachments", isOn: $scanIMessageAttachments)
                 Toggle("Scan broken symlinks", isOn: $scanBrokenSymlinks)
                 Toggle("Scan screen recordings", isOn: $scanScreenRecordings)
+                Toggle("Scan old installer files", isOn: $scanOldInstallers)
             }
 
         }
@@ -413,7 +485,7 @@ struct SettingsView: View {
             } header: {
                 Text("Deletion Behavior")
             } footer: {
-                Text("When enabled, files are moved to Trash first. If that fails, they are deleted permanently.")
+                Text("When enabled, files are moved to Trash and can be restored. Trash failures are reported and may request administrator access; SparkClean never silently falls back to permanent deletion. Caution items always go to Trash.")
             }
         }
         .formStyle(.grouped)

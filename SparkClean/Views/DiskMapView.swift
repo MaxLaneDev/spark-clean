@@ -1,0 +1,492 @@
+//
+//  DiskMapView.swift
+//  SparkClean
+//
+//  Created by George Khananaev.
+//
+
+import SwiftUI
+import AppKit
+
+struct DiskMapView: View {
+    @State private var manager = DiskMapManager.shared
+    @State private var didRunLaunchAnalysis = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+
+            if let snapshot = manager.snapshot {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if manager.isScanning {
+                            progressBanner
+                        }
+                        if let error = manager.lastError {
+                            accessBanner(error, snapshot: snapshot)
+                        }
+                        capacityCard(snapshot)
+                        dataVolumeSection(snapshot)
+                        entrySection(
+                            title: "Your files",
+                            subtitle: NSHomeDirectory(),
+                            entries: snapshot.homeRoots,
+                            comparisonSize: snapshot.dataVolumeUsedSpace
+                        )
+                        entrySection(
+                            title: "Your Library",
+                            subtitle: "~/Library — app data, containers, messages, mail, and caches",
+                            entries: snapshot.libraryRoots,
+                            comparisonSize: snapshot.dataVolumeUsedSpace
+                        )
+                        apfsVolumesSection(snapshot)
+                        auditFooter(snapshot)
+                    }
+                    .padding(20)
+                }
+                .background(Color(nsColor: .controlBackgroundColor))
+            } else if manager.isScanning {
+                scanningPlaceholder
+            } else {
+                emptyState
+            }
+        }
+        .onAppear {
+            guard !didRunLaunchAnalysis else { return }
+            didRunLaunchAnalysis = true
+            let requestedAtLaunch = ProcessInfo.processInfo.arguments.contains("--analyze-storage")
+            let shouldHonorLaunchRequest = requestedAtLaunch && !manager.didHandleLaunchRequest
+            if shouldHonorLaunchRequest {
+                manager.didHandleLaunchRequest = true
+            }
+            if manager.snapshot == nil || shouldHonorLaunchRequest {
+                Task { await manager.scan() }
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "internaldrive.fill")
+                .font(.title2)
+                .foregroundStyle(.indigo)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Disk Map")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                if let snapshot = manager.snapshot {
+                    Text(
+                        "\(CleanupManager.formatBytes(snapshot.containerUsedSpace)) used of "
+                        + "\(CleanupManager.formatBytes(snapshot.containerTotalSpace))"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text("See where all startup-disk space is allocated")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Button {
+                if manager.isScanning {
+                    manager.cancel()
+                } else {
+                    Task { await manager.scan() }
+                }
+            } label: {
+                Label(
+                    manager.isScanning ? "Cancel" : "Analyze Disk",
+                    systemImage: manager.isScanning ? "xmark.circle" : "magnifyingglass"
+                )
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .tint(manager.isScanning ? .red : .indigo)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+    }
+
+    private var progressBanner: some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.small)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Updating the disk map…")
+                    .font(.callout.weight(.semibold))
+                Text(manager.currentItem)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("This can take several minutes on a full disk.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.indigo.opacity(0.08))
+        )
+    }
+
+    private func accessBanner(_ message: String, snapshot: DiskMapSnapshot) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: snapshot.hasFullDiskAccess ? "lock.trianglebadge.exclamationmark" : "lock.shield")
+                .foregroundStyle(.orange)
+                .font(.title3)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(snapshot.hasFullDiskAccess ? "Some protected space remains" : "Full Disk Access needed")
+                    .font(.callout.weight(.semibold))
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if !snapshot.hasFullDiskAccess {
+                Button("Grant Access") {
+                    if let url = URL(
+                        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+                    ) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.orange.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+
+    private func capacityCard(_ snapshot: DiskMapSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("Startup APFS container", systemImage: "externaldrive.fill")
+                    .font(.headline)
+                Spacer()
+                Text("\(String(format: "%.1f", usedPercentage(snapshot)))% used")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.green.opacity(0.18))
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.indigo, .blue],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(
+                            width: geometry.size.width
+                                * CGFloat(min(1, max(0, usedPercentage(snapshot) / 100)))
+                        )
+                }
+            }
+            .frame(height: 18)
+
+            HStack(spacing: 28) {
+                metric("Used", snapshot.containerUsedSpace, color: .indigo)
+                metric("Free", snapshot.containerFreeSpace, color: .green)
+                metric("Data volume", snapshot.dataVolumeUsedSpace, color: .blue)
+                metric("Readable files", snapshot.measuredDataFileSpace, color: .teal)
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(nsColor: .windowBackgroundColor))
+        )
+    }
+
+    private func metric(_ title: String, _ value: Int64, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Circle().fill(color).frame(width: 7, height: 7)
+                Text(title).foregroundStyle(.secondary)
+            }
+            .font(.caption)
+            Text(CleanupManager.formatBytes(value))
+                .font(.callout.monospacedDigit().weight(.semibold))
+        }
+    }
+
+    private func dataVolumeSection(_ snapshot: DiskMapSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeading(
+                "Data volume",
+                subtitle: "Non-overlapping top-level locations — not just cleanup candidates"
+            )
+
+            if snapshot.unaccountedDataSpace > 0 {
+                specialRow(
+                    name: "Protected & APFS-managed space",
+                    description: protectedDescription(snapshot),
+                    size: snapshot.unaccountedDataSpace,
+                    icon: "lock.square.stack.fill",
+                    color: .orange,
+                    comparisonSize: snapshot.dataVolumeUsedSpace
+                )
+            }
+
+            ForEach(snapshot.dataRoots) { entry in
+                entryRow(entry, comparisonSize: snapshot.dataVolumeUsedSpace)
+            }
+
+            if snapshot.sharedBlockOvercount > 0 {
+                specialRow(
+                    name: "Shared APFS clone records",
+                    description: "Folder totals overlap by this amount; APFS stores the shared blocks only once.",
+                    size: snapshot.sharedBlockOvercount,
+                    icon: "square.on.square",
+                    color: .purple,
+                    comparisonSize: max(snapshot.measuredDataFileSpace, 1)
+                )
+            }
+        }
+    }
+
+    private func entrySection(
+        title: String,
+        subtitle: String,
+        entries: [DiskMapEntry],
+        comparisonSize: Int64
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeading(title, subtitle: subtitle)
+            if entries.isEmpty {
+                Text("No measurable folders were found.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(entries) { entry in
+                    entryRow(entry, comparisonSize: comparisonSize)
+                }
+            }
+        }
+    }
+
+    private func apfsVolumesSection(_ snapshot: DiskMapSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeading(
+                "APFS volumes",
+                subtitle: "macOS shares one physical container across these volumes"
+            )
+            ForEach(snapshot.volumes) { volume in
+                HStack(spacing: 12) {
+                    Image(systemName: volume.roles.contains("Data") ? "person.crop.square.fill" : "gearshape.2.fill")
+                        .foregroundStyle(volume.roles.contains("Data") ? .blue : .secondary)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(volume.name)
+                            .font(.callout)
+                        Text(volume.displayRole)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(CleanupManager.formatBytes(volume.usedSpace))
+                        .font(.callout.monospacedDigit().weight(.medium))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(rowBackground)
+            }
+            if snapshot.apfsContainerOverhead > 0 {
+                specialRow(
+                    name: "APFS container metadata",
+                    description: "Filesystem metadata not assigned to an individual APFS volume.",
+                    size: snapshot.apfsContainerOverhead,
+                    icon: "cylinder.split.1x2",
+                    color: .secondary,
+                    comparisonSize: snapshot.containerUsedSpace
+                )
+            }
+        }
+    }
+
+    private func entryRow(_ entry: DiskMapEntry, comparisonSize: Int64) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 12) {
+                Image(systemName: entry.measurementIncomplete ? "folder.badge.questionmark" : "folder.fill")
+                    .foregroundStyle(entry.measurementIncomplete ? .orange : .indigo)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.name)
+                        .font(.callout)
+                        .lineLimit(1)
+                    if entry.measurementIncomplete {
+                        Text("Partial — contains unreadable locations")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                Spacer()
+                Text(CleanupManager.formatBytes(entry.size))
+                    .font(.callout.monospacedDigit().weight(.medium))
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([
+                        URL(fileURLWithPath: entry.path)
+                    ])
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .buttonStyle(.borderless)
+                .help("Reveal in Finder")
+            }
+            GeometryReader { geometry in
+                Capsule()
+                    .fill(Color.indigo.opacity(0.18))
+                    .overlay(alignment: .leading) {
+                        Capsule()
+                            .fill(entry.measurementIncomplete ? Color.orange : Color.indigo)
+                            .frame(
+                                width: geometry.size.width * CGFloat(
+                                    min(1, Double(entry.size) / Double(max(1, comparisonSize)))
+                                )
+                            )
+                    }
+            }
+            .frame(height: 4)
+            .padding(.leading, 34)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(rowBackground)
+    }
+
+    private func specialRow(
+        name: String,
+        description: String,
+        size: Int64,
+        icon: String,
+        color: Color,
+        comparisonSize: Int64
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.callout.weight(.semibold))
+                Text(description)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(CleanupManager.formatBytes(size))
+                .font(.callout.monospacedDigit().weight(.semibold))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(color.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color.opacity(0.18), lineWidth: 1)
+                )
+        )
+        .accessibilityLabel(
+            "\(name), \(CleanupManager.formatBytes(size)), "
+            + "\(Int(Double(size) / Double(max(1, comparisonSize)) * 100)) percent"
+        )
+    }
+
+    private func sectionHeading(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.headline)
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func auditFooter(_ snapshot: DiskMapSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(
+                "Analyzed \(snapshot.generatedAt.formatted(date: .abbreviated, time: .standard)) "
+                + "in \(String(format: "%.1f", snapshot.scanDuration)) seconds."
+            )
+            Text("Latest audit: ~/Library/Logs/SparkClean/latest-storage-map.json")
+            Text("Folder values are allocated-size estimates. APFS volume totals above are authoritative.")
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+    }
+
+    private var scanningPlaceholder: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Building your complete disk map…")
+                .font(.headline)
+            Text(manager.currentItem)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("This is read-only and may take several minutes on a full disk.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "internaldrive")
+                .font(.system(size: 42))
+                .foregroundStyle(.secondary)
+            Text("No disk map yet")
+                .font(.headline)
+            Text("Analyze the startup disk to account for files, protected data, and APFS volumes.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let error = manager.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            Button("Analyze Disk") {
+                Task { await manager.scan() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.indigo)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var rowBackground: some ShapeStyle {
+        Color(nsColor: .windowBackgroundColor)
+    }
+
+    private func usedPercentage(_ snapshot: DiskMapSnapshot) -> Double {
+        guard snapshot.containerTotalSpace > 0 else { return 0 }
+        return Double(snapshot.containerUsedSpace) / Double(snapshot.containerTotalSpace) * 100
+    }
+
+    private func protectedDescription(_ snapshot: DiskMapSnapshot) -> String {
+        if !snapshot.hasFullDiskAccess {
+            return "Files hidden by macOS privacy controls plus filesystem metadata and shared APFS blocks."
+        }
+        return "macOS-owned files, filesystem metadata, snapshots, and blocks a folder walk cannot safely assign."
+    }
+}

@@ -17,7 +17,10 @@ private var _introPlayedThisSession = false
 struct ContentView: View {
     @State private var manager = CleanupManager()
     @State private var showCleanAlert = false
-    @State private var selectedSidebar: SidebarItem = .dashboard
+    @State private var selectedSidebar: SidebarItem =
+        ProcessInfo.processInfo.arguments.contains("--analyze-storage")
+        ? .diskMap
+        : .dashboard
     @State private var showExportSheet = false
     @State private var showCleanComplete = false
     @State private var exportVerbose = false
@@ -86,8 +89,14 @@ struct ContentView: View {
                     StartupManagerView()
                 case .timeMachine:
                     TimeMachineView()
+                case .diskMap:
+                    DiskMapView()
                 case .storageInsights:
-                    StorageInsightsView()
+                    StorageInsightsView {
+                        selectedSidebar = .group(.applications)
+                        guard !manager.isScanning else { return }
+                        Task { await manager.scan(onlyGroup: .applications) }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -95,24 +104,67 @@ struct ContentView: View {
         // Clean confirmation with safety breakdown
         .sheet(isPresented: $showCleanAlert) {
             CleanConfirmationSheet(manager: manager, isPresented: $showCleanAlert) {
+                attemptToQuitAssociatedApps in
                 Task {
-                    await manager.clean()
+                    await manager.clean(
+                        attemptToQuitAssociatedApps: attemptToQuitAssociatedApps
+                    )
+                    manager.fetchDiskUsage()
                     showCleanComplete = true
                 }
             }
         }
         // Clean complete
-        .alert("Cleanup Complete", isPresented: $showCleanComplete) {
+        .alert(
+            manager.lastMovedToTrashSize > 0 &&
+                manager.lastPermanentlyDeletedSize == 0
+                ? "Moved to Trash"
+                : "Cleanup Complete",
+            isPresented: $showCleanComplete
+        ) {
             if !manager.cleanErrors.isEmpty {
                 Button("Show Errors") { showCleanErrors = true }
             }
-            Button("Open Trash") {
-                NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.Trash"))
+            if manager.canRestoreLastCleanup {
+                Button("Restore Cleanup") {
+                    Task {
+                        guard let outcome = await manager.restoreLastCleanup() else { return }
+                        restoreMessage = "Restored \(outcome.restored) item(s)."
+                        if outcome.skippedExisting > 0 {
+                            restoreMessage += " \(outcome.skippedExisting) conflict(s) remain available to retry."
+                        }
+                        if outcome.missingInTrash > 0 {
+                            restoreMessage += " \(outcome.missingInTrash) item(s) were no longer in Trash."
+                        }
+                        if outcome.failed > 0 {
+                            restoreMessage += " \(outcome.failed) item(s) failed validation or could not be restored."
+                        }
+                        showRestoreResult = true
+                        manager.fetchDiskUsage()
+                    }
+                }
+            }
+            if manager.lastMovedToTrashSize > 0 {
+                Button("Open Trash") {
+                    NSWorkspace.shared.open(
+                        URL(fileURLWithPath: NSHomeDirectory() + "/.Trash")
+                    )
+                }
             }
             Button("OK") {}
         } message: {
-            let errorNote = manager.cleanErrors.isEmpty ? "" : "\n\n\(manager.cleanErrors.count) items could not be removed."
-            Text("Cleaned \(CleanupManager.formatBytes(manager.lastCleanedSize)) across \(manager.lastCleanedCount) categories (\(manager.cleanSuccessCount) succeeded, \(manager.cleanFailCount) had errors).\(errorNote)")
+            let errorNote = manager.cleanErrors.isEmpty
+                ? ""
+                : "\n\n\(manager.cleanErrors.count) cleanup issue(s) were reported."
+            let trashNote = manager.lastMovedToTrashSize > 0
+                ? "\n\n\(CleanupManager.formatBytes(manager.lastMovedToTrashSize)) was moved to Trash and is still using disk space. Empty Trash to reclaim that space, or restore the cleanup before emptying it."
+                : ""
+            let permanentNote = manager.lastPermanentlyDeletedSize > 0
+                ? "\n\n\(CleanupManager.formatBytes(manager.lastPermanentlyDeletedSize)) was permanently removed."
+                : ""
+            Text(
+                "Processed \(CleanupManager.formatBytes(manager.lastCleanedSize)) across \(manager.lastCleanedCount) categories (\(manager.cleanSuccessCount) succeeded, \(manager.cleanFailCount) had errors).\(trashNote)\(permanentNote)\(errorNote)"
+            )
         }
         // Clean errors detail
         .alert("Clean Errors", isPresented: $showCleanErrors) {
@@ -228,7 +280,7 @@ struct ContentView: View {
                     let selectedSize = selectedCats.reduce(0) { $0 + $1.selectedSize }
                     let sizeText = hasResults ? CleanupManager.formatBytes(selectedSize) : "—"
                     SidebarRow(
-                        label: group.rawValue,
+                        label: group.displayName,
                         icon: group.icon,
                         iconColor: hasResults ? group.color : .gray,
                         trailing: sizeText,
@@ -285,6 +337,15 @@ struct ContentView: View {
                     isSelected: selectedSidebar == .timeMachine
                 ) {
                     selectedSidebar = .timeMachine
+                }
+
+                SidebarRow(
+                    label: "Disk Map",
+                    icon: "internaldrive.fill",
+                    iconColor: .indigo,
+                    isSelected: selectedSidebar == .diskMap
+                ) {
+                    selectedSidebar = .diskMap
                 }
 
                 SidebarRow(
@@ -404,6 +465,8 @@ struct DashboardView: View {
                                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         }
 
+                        storageScopeNotice
+
                         if manager.categories.contains(where: { $0.safetyLevel == .safe && $0.isSelected }) {
                             smartRecommendation
                                 .transition(.move(edge: .top).combined(with: .opacity))
@@ -465,6 +528,7 @@ struct DashboardView: View {
 
             if manager.scanComplete {
                 Button {
+                    manager.pendingCleanGroup = nil
                     showCleanAlert = true
                 } label: {
                     HStack(spacing: 6) {
@@ -478,7 +542,7 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.red)
-                .disabled(manager.isScanning || manager.isCleaning || manager.totalSize == 0)
+                .disabled(manager.isScanning || manager.isCleaning || !manager.hasSelectedContent)
             }
 
             Button {
@@ -527,6 +591,39 @@ struct DashboardView: View {
 
     // MARK: Smart Recommendation
 
+    private var storageScopeNotice: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "externaldrive.badge.exclamationmark")
+                .foregroundStyle(.teal)
+                .font(.title3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Cleanup results are not your whole disk")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Personal files and app data can use far more space. Disk Map accounts for the whole APFS container, including protected and system-managed space.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button("Review Storage") {
+                selectedSidebar = .diskMap
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.teal.opacity(0.07))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.teal.opacity(0.18), lineWidth: 1)
+                )
+        )
+    }
+
     private var smartRecommendation: some View {
         let safeCats = manager.categories.filter { $0.safetyLevel == .safe && $0.isSelected }
         let safeSize = safeCats.reduce(0 as Int64) { $0 + $1.selectedSize }
@@ -538,7 +635,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Quick Clean Available")
                     .font(.system(size: 13, weight: .semibold))
-                Text("\(safeCats.count) safe categories can free \(CleanupManager.formatBytes(safeSize)) with no risk.")
+                Text("\(safeCats.count) rebuildable cache/log categories can free \(CleanupManager.formatBytes(safeSize)).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -738,15 +835,47 @@ struct DashboardView: View {
 struct CleanConfirmationSheet: View {
     let manager: CleanupManager
     @Binding var isPresented: Bool
-    let onConfirm: () -> Void
+    let onConfirm: (Bool) -> Void
+    @AppStorage("preferTrash") private var preferTrash = true
 
     private var selectedCategories: [CleanupCategory] {
-        manager.categories.filter { $0.isSelected && $0.selectedSize > 0 }
+        manager.categories.filter {
+            $0.isSelected && $0.hasSelectedContent &&
+                (manager.pendingCleanGroup == nil || $0.group == manager.pendingCleanGroup)
+        }
     }
 
     private var safeCount: Int { selectedCategories.filter { $0.safetyLevel == .safe }.count }
     private var reviewCount: Int { selectedCategories.filter { $0.safetyLevel == .review }.count }
     private var cautionCount: Int { selectedCategories.filter { $0.safetyLevel == .caution }.count }
+    private var selectedSize: Int64 {
+        selectedCategories.reduce(0) { $0 + $1.selectedSize }
+    }
+    private var selectedFiles: Int {
+        selectedCategories.reduce(0) { $0 + $1.selectedFileCount }
+    }
+    private var trashItems: [CleanupCategory] {
+        selectedCategories.filter { !isPermanent($0) }
+    }
+    private var permanentItems: [CleanupCategory] {
+        selectedCategories.filter { isPermanent($0) }
+    }
+    private var runningAssociatedApps: [String] {
+        let bundleIDs = Set(selectedCategories.flatMap(\.associatedBundleIDs))
+        return Set(NSWorkspace.shared.runningApplications.compactMap { app in
+            guard let bundleID = app.bundleIdentifier,
+                  bundleIDs.contains(bundleID) else { return nil }
+            return app.localizedName ?? bundleID
+        }).sorted()
+    }
+    private var categoriesWithWarnings: [CleanupCategory] {
+        selectedCategories.filter { $0.cleanupWarning?.isEmpty == false }
+    }
+    private func isPermanent(_ category: CleanupCategory) -> Bool {
+        category.isDockerResource || category.isOllamaResource ||
+            category.requiresPermanentDeletion ||
+            (!preferTrash && category.safetyLevel != .caution)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -768,11 +897,64 @@ struct CleanConfirmationSheet: View {
             // Summary
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if !preferTrash {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.octagon.fill")
+                                .foregroundStyle(.red)
+                            Text("Permanent-delete mode is enabled. Safe and Review file categories will be deleted immediately and cannot be restored. Caution categories still go to Trash.")
+                                .font(.callout)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.red)
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.1)))
+                    }
+
+                    if !runningAssociatedApps.isEmpty {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "app.badge.checkmark")
+                                .foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Close applications before cleanup")
+                                    .font(.callout)
+                                    .fontWeight(.semibold)
+                                Text("\(runningAssociatedApps.joined(separator: ", ")) currently owns selected cache or privacy data. Quit Apps & Clean waits up to five seconds; anything still running is skipped.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.orange.opacity(0.08))
+                        )
+                    }
+
+                    ForEach(categoriesWithWarnings) { category in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.octagon.fill")
+                                .foregroundStyle(.red)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(category.name) changes app data")
+                                    .font(.callout)
+                                    .fontWeight(.semibold)
+                                Text(category.cleanupWarning ?? "")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.red.opacity(0.08))
+                        )
+                    }
+
                     // Overview
                     HStack(spacing: 20) {
-                        summaryCard("Total Size", value: CleanupManager.formatBytes(manager.totalSize), color: .blue)
+                        summaryCard("Total Size", value: CleanupManager.formatBytes(selectedSize), color: .blue)
                         summaryCard("Categories", value: "\(selectedCategories.count)", color: .purple)
-                        summaryCard("Items", value: "\(manager.totalFiles)", color: .orange)
+                        summaryCard("Items", value: "\(selectedFiles)", color: .orange)
                     }
                     .padding(.top, 12)
 
@@ -791,10 +973,6 @@ struct CleanConfirmationSheet: View {
                             safetyRow(level: .caution, count: cautionCount)
                         }
                     }
-
-                    // Category list — split by deletion method
-                    let trashItems = selectedCategories.filter { !$0.isDockerResource && !$0.isOllamaResource }
-                    let permanentItems = selectedCategories.filter { $0.isDockerResource || $0.isOllamaResource }
 
                     if !trashItems.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
@@ -853,7 +1031,7 @@ struct CleanConfirmationSheet: View {
                             Text("Recovery")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                            Text("Files will be moved to Trash when possible. You can restore them from Trash before emptying it. Some items (Docker resources, Ollama models) are removed permanently through their respective CLI tools.")
+                            Text("Items listed under Moved to Trash are recorded for Restore Last Cleanup. Items listed under Permanently Deleted cannot be restored by SparkClean.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -889,6 +1067,7 @@ struct CleanConfirmationSheet: View {
             // Buttons
             HStack(spacing: 12) {
                 Button("Cancel") {
+                    manager.pendingCleanGroup = nil
                     isPresented = false
                 }
                 .keyboardShortcut(.cancelAction)
@@ -897,19 +1076,42 @@ struct CleanConfirmationSheet: View {
 
                 Spacer()
 
-                Button {
-                    isPresented = false
-                    onConfirm()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                        Text("Move to Trash — \(CleanupManager.formatBytes(manager.totalSize))")
+                if !runningAssociatedApps.isEmpty {
+                    Button("Skip Running Apps") {
+                        isPresented = false
+                        onConfirm(false)
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                    Button {
+                        isPresented = false
+                        onConfirm(true)
+                    } label: {
+                        Label(
+                            "Quit Apps & Clean",
+                            systemImage: "power"
+                        )
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .controlSize(.large)
+                } else {
+                    Button {
+                        isPresented = false
+                        onConfirm(false)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: permanentItems.isEmpty ? "trash" : "exclamationmark.triangle.fill")
+                            Text("\(permanentItems.isEmpty ? "Move to Trash" : "Clean Selected") — \(CleanupManager.formatBytes(selectedSize))")
+                        }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .controlSize(.large)
                 }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                .controlSize(.large)
             }
             .padding(20)
         }
@@ -932,7 +1134,11 @@ struct CleanConfirmationSheet: View {
                 .font(.callout)
 
             if permanent {
-                Text(cat.isDockerResource ? "via Docker CLI" : "via Ollama CLI")
+                Text(cat.isDockerResource
+                     ? "via Docker CLI"
+                     : (cat.isOllamaResource
+                        ? "via Ollama CLI"
+                        : (cat.requiresPermanentDeletion ? "empty Trash" : "direct delete")))
                     .font(.caption2)
                     .foregroundStyle(.red)
                     .padding(.horizontal, 5)
@@ -1318,10 +1524,10 @@ struct HelpView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     helpSection("Getting Started",
-                        "Click **Scan** to analyze your Mac. SparkClean will find caches, temporary files, build artifacts, and other reclaimable space.")
+                        "Click **Scan** to analyze your Mac. SparkClean will find caches, reviewable stale temporary files, build artifacts, and other reclaimable space.")
 
                     helpSection("Safety Levels",
-                        "**Safe** (green): Caches and temp files that rebuild automatically. No risk.\n**Review** (orange): User files like old downloads. Check before deleting.\n**Caution** (red): App data or Docker resources. Could affect running apps.")
+                        "**Safe** (green): Low-risk caches, logs, and generated files expected to rebuild.\n**Review** (orange): User files like old downloads or stale temp files. Check before deleting.\n**Caution** (red): App data or Docker resources. Could affect running apps.")
 
                     helpSection("Cleaning",
                         "Select categories you want to clean, then click **Clean**. Files are moved to Trash by default so you can recover them if needed.")
@@ -1370,21 +1576,24 @@ struct PrivacyPolicyView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Last updated: March 2026")
+                    Text("Last updated: July 2026")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                     policySection("Data Collection",
-                        "SparkClean does NOT collect, transmit, or store any personal data. All scanning and cleanup operations happen entirely on your device.")
+                        "SparkClean does not send personal data, file paths, or scan results to George Khananaev or any SparkClean service. Scanning and cleanup happen on your device.")
 
                     policySection("Network Access",
-                        "SparkClean works offline by default. The only network request is an optional update check (Settings > About) that contacts GitHub to compare your version with the latest release. No analytics, no telemetry, no tracking.")
+                        "SparkClean works offline by default. Optional update checks contact GitHub to compare versions. If you choose Download Update, the selected GitHub release is downloaded to a location you approve. No analytics, telemetry, or tracking requests are sent.")
 
                     policySection("File Access",
-                        "SparkClean reads file metadata (sizes, dates) to identify reclaimable space. It only deletes files you explicitly select and confirm. Files are moved to Trash by default.")
+                        "SparkClean reads file metadata (including paths, sizes, and dates) to identify reviewable space. It only removes categories or items you select and confirm. Files move to Trash by default; the confirmation sheet identifies command-based and permanent exceptions.")
+
+                    policySection("Local Records",
+                        "Settings, Storage Insights size history, the latest scan audit, Restore Last Cleanup manifests, and deletion audit logs are stored only on this Mac. Scan, undo, and audit records can contain local file paths. They are kept under ~/Library/Application Support/SparkClean and ~/Library/Logs/SparkClean, are never uploaded, and can be removed by deleting those folders.")
 
                     policySection("Third-Party Services",
-                        "SparkClean does not integrate with any third-party services, advertising networks, or analytics platforms.")
+                        "GitHub is used only for optional release checks and user-requested downloads. SparkClean does not integrate with advertising networks or analytics platforms.")
 
                     policySection("Contact",
                         "For questions about this privacy policy, visit github.com/georgekhananaev/spark-clean/issues")

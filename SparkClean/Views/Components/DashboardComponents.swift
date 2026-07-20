@@ -189,7 +189,7 @@ struct GroupCard: View {
                         .foregroundStyle(group.color)
                 }
 
-                Text(group.rawValue)
+                Text(group.displayName)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
 
@@ -213,7 +213,7 @@ struct GroupCard: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(group.rawValue): \(categories.count) categories, \(CleanupManager.formatBytes(groupSize))")
+        .accessibilityLabel("\(group.displayName): \(categories.count) categories, \(CleanupManager.formatBytes(groupSize))")
     }
 }
 

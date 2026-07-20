@@ -385,6 +385,20 @@ struct TrashLeftoverSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isCleaning = false
     @State private var cleaned = false
+    @State private var cleanupError: String?
+    @State private var selectedPaths = Set<String>()
+    @State private var completedPaths = Set<String>()
+    @State private var initializedSelection = false
+
+    private var visibleLeftovers: [TrashMonitor.LeftoverItem] {
+        detected.leftovers.filter { !completedPaths.contains($0.path) }
+    }
+
+    private var selectedSize: Int64 {
+        visibleLeftovers
+            .filter { selectedPaths.contains($0.path) }
+            .reduce(0) { $0 + $1.size }
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -405,8 +419,21 @@ struct TrashLeftoverSheet: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
-                        ForEach(detected.leftovers, id: \.path) { item in
+                        ForEach(visibleLeftovers, id: \.path) { item in
                             HStack {
+                                Toggle("", isOn: Binding(
+                                    get: { selectedPaths.contains(item.path) },
+                                    set: { selected in
+                                        if selected {
+                                            selectedPaths.insert(item.path)
+                                        } else {
+                                            selectedPaths.remove(item.path)
+                                        }
+                                    }
+                                ))
+                                .toggleStyle(.checkbox)
+                                .labelsHidden()
+
                                 Text(item.category)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -427,69 +454,137 @@ struct TrashLeftoverSheet: View {
             }
 
             HStack {
-                Text("Files will be moved to Trash (recoverable).")
+                Text("\(CleanupManager.formatBytes(selectedSize)) selected · moved to Trash (recoverable).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
 
                 if cleaned {
-                    Label("Cleaned!", systemImage: "checkmark.circle.fill")
+                    Label("Selected leftovers cleaned", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
-                    Button("Clean Leftovers") {
+                    if let cleanupError {
+                        Text(cleanupError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                    if isCleaning {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Button(cleanupError == nil ? "Clean Leftovers" : "Retry Remaining") {
                         cleanLeftovers()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isCleaning)
+                    .disabled(isCleaning || selectedPaths.isEmpty)
                 }
             }
         }
         .padding(20)
         .frame(width: 500, height: 350)
+        .onAppear {
+            guard !initializedSelection else { return }
+            // User-data locations need an explicit opt-in; generated cache/log state
+            // is selected by default.
+            let generatedCategories: Set<String> = [
+                "Caches", "Logs", "Saved State", "HTTP Storage", "WebKit Data",
+            ]
+            selectedPaths = Set(detected.leftovers.compactMap {
+                generatedCategories.contains($0.category) ? $0.path : nil
+            })
+            initializedSelection = true
+        }
     }
 
     private func cleanLeftovers() {
         isCleaning = true
-        Task.detached(priority: .userInitiated) {
-            let fm = FileManager.default
-            var failedPaths: [String] = []
+        cleanupError = nil
+        let pathsToClean = selectedPaths
+        let itemsToClean = detected.leftovers.filter {
+            pathsToClean.contains($0.path)
+        }
+        let appName = detected.appName
+        DispatchQueue.global(qos: .userInitiated).async {
+            let remover = FileRemover(policy: CleanupManager.deletionPolicy, useTrash: true)
+            let recorder = CleanupSessionRecorder(
+                appVersion: CleanupManager.appVersionString,
+                trashMode: true,
+                store: CleanupManager.manifestStore
+            )
+            var failures: [String] = []
+            var needsAdmin: [FileRemover.AdminRequest] = []
+            var completed = Set<String>()
+            let category = "Trash Monitor: \(appName)"
 
-            for item in detected.leftovers {
-                let url = URL(fileURLWithPath: item.path)
-                if (try? fm.trashItem(at: url, resultingItemURL: nil)) == nil {
-                    failedPaths.append(item.path)
+            for item in itemsToClean {
+                switch remover.remove(
+                    item.path,
+                    allowedRoots: [item.path],
+                    knownSize: item.size,
+                    expectedIsDirectory: item.isDirectory,
+                    expectedIdentity: item.fileIdentity
+                ) {
+                case .removed(let removal):
+                    completed.insert(removal.originalPath)
+                    recorder.record(removal, category: category)
+                    DeletionAuditLogger.shared.record(
+                        [removal],
+                        category: category,
+                        sessionID: recorder.sessionID,
+                        appVersion: CleanupManager.appVersionString,
+                        trashMode: true
+                    )
+                case .needsAdmin(let path):
+                    needsAdmin.append(FileRemover.AdminRequest(
+                        path: path,
+                        allowedRoots: [item.path],
+                        knownSize: item.size,
+                        expectedIsDirectory: item.isDirectory,
+                        expectedIdentity: item.fileIdentity
+                    ))
+                case .blocked(let reason):
+                    failures.append("\((item.path as NSString).lastPathComponent): \(reason)")
+                case .skippedICloud:
+                    failures.append("\((item.path as NSString).lastPathComponent): iCloud item protected")
+                case .failed(let error):
+                    if error == "Item no longer exists" {
+                        completed.insert(item.path)
+                    } else {
+                        failures.append("\((item.path as NSString).lastPathComponent): \(error)")
+                    }
                 }
             }
 
-            // Escalate failed paths via admin privileges
-            if !failedPaths.isEmpty {
-                let trashDir = NSHomeDirectory() + "/.Trash"
-                let tempScript = NSTemporaryDirectory() + "sparkclean_leftover_\(ProcessInfo.processInfo.processIdentifier).sh"
-                var script = "#!/bin/bash\nset -e\n"
-                for path in failedPaths {
-                    let escaped = path.replacingOccurrences(of: "'", with: "'\\''")
-                    let name = (path as NSString).lastPathComponent.replacingOccurrences(of: "'", with: "'\\''")
-                    let trashEscaped = trashDir.replacingOccurrences(of: "'", with: "'\\''")
-                    script += "dest='\(trashEscaped)/\(name)'; "
-                    script += "if [ -e \"$dest\" ]; then i=2; while [ -e \"$dest $i\" ]; do i=$((i+1)); done; dest=\"$dest $i\"; fi; "
-                    script += "/bin/mv '\(escaped)' \"$dest\"\n"
+            if !needsAdmin.isEmpty {
+                let admin = remover.moveToTrashWithAdministratorPrivileges(
+                    needsAdmin,
+                    confirmationTitle: "\(appName) Leftovers Need Administrator Access"
+                )
+                for removal in admin.removals {
+                    completed.insert(removal.originalPath)
+                    recorder.record(removal, category: category)
+                    DeletionAuditLogger.shared.record(
+                        [removal],
+                        category: category,
+                        sessionID: recorder.sessionID,
+                        appVersion: CleanupManager.appVersionString,
+                        trashMode: true
+                    )
                 }
-                try? script.write(toFile: tempScript, atomically: true, encoding: .utf8)
-                try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempScript)
-
-                let escapedScript = tempScript.replacingOccurrences(of: "'", with: "'\\''")
-                let appleScriptSource = "do shell script \"'\(escapedScript)'\" with administrator privileges"
-
-                await MainActor.run {
-                    var error: NSDictionary?
-                    let appleScript = NSAppleScript(source: appleScriptSource)
-                    appleScript?.executeAndReturnError(&error)
-                }
-                try? fm.removeItem(atPath: tempScript)
+                failures.append(contentsOf: admin.failures)
+                if admin.wasCancelled { failures.append("Administrator cleanup was cancelled") }
             }
+            recorder.finish()
 
-            await MainActor.run {
-                cleaned = true
+            let completedSnapshot = completed
+            let failureCount = failures.count
+            DispatchQueue.main.async {
+                completedPaths.formUnion(completedSnapshot)
+                selectedPaths.subtract(completedSnapshot)
+                cleaned = failureCount == 0
+                cleanupError = failureCount == 0
+                    ? nil
+                    : "\(failureCount) item(s) could not be removed."
                 isCleaning = false
             }
         }

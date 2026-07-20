@@ -138,10 +138,17 @@ struct CleanupManagerLogicTests {
         manager.categories = [
             makeCategory(name: "A", group: .system, selected: false),
             makeCategory(name: "B", group: .browsers, selected: false),
+            makeCategory(
+                name: "Caution",
+                group: .system,
+                safetyLevel: .caution,
+                selected: false
+            ),
         ]
         manager.selectAll(in: .system)
         #expect(manager.categories[0].isSelected == true)
         #expect(manager.categories[1].isSelected == false)
+        #expect(manager.categories[2].isSelected == false)
     }
 
     @Test func deselectAllInGroup() {
@@ -165,6 +172,32 @@ struct CleanupManagerLogicTests {
         #expect(manager.totalSize == 3000)
         #expect(manager.overallSize == 6000)
         #expect(manager.selectedCategoryCount == 2)
+    }
+
+    @Test func managedMediaStoreUsesCategoryLevelSelection() {
+        let root = "/Users/test/Library/Group Containers/example/Message/Media"
+        let category = CleanupCategory(
+            name: "WhatsApp Chat Media",
+            icon: "photo.stack.fill",
+            color: .green,
+            description: "Media",
+            cleanupWarning: "Attachments may become unavailable.",
+            group: .applications,
+            safetyLevel: .caution,
+            paths: [root],
+            breakdown: [
+                PathStat(path: root, size: 100, fileCount: 5),
+            ],
+            deleteChildrenOnly: true,
+            allowsBreakdownSelection: false,
+            size: 100,
+            fileCount: 5,
+            isSelected: false
+        )
+
+        #expect(!category.hasPerFileSelection)
+        #expect(category.cleanupWarning != nil)
+        #expect(category.selectedSize == 100)
     }
 
     @Test func filteredCategories() {
@@ -246,6 +279,29 @@ struct CleanupManagerLogicTests {
     }
 }
 
+struct CleanupExclusionTests {
+
+    @Test func parentChildExclusionsUseComponentBoundaries() {
+        let excluded = ["/Users/testuser/Library/Logs/DiagnosticReports"]
+        #expect(CleanupManager.path(
+            "/Users/testuser/Library/Logs/DiagnosticReports",
+            overlapsAny: excluded
+        ))
+        #expect(CleanupManager.path(
+            "/Users/testuser/Library/Logs",
+            overlapsAny: excluded
+        ))
+        #expect(!CleanupManager.path(
+            "/Users/testuser/Library/Logs/DiagnosticReports-old",
+            overlapsAny: excluded
+        ))
+        #expect(!CleanupManager.path(
+            "/Users/testuser/Library/Logs/Other",
+            overlapsAny: excluded
+        ))
+    }
+}
+
 // MARK: - Model Tests
 
 struct ModelTests {
@@ -278,6 +334,60 @@ struct ModelTests {
         #expect(summary.totalCategories == 5)
         #expect(summary.totalSize == 1000)
         #expect(summary.scanDuration == 2.5)
+    }
+
+    @Test func zeroByteReviewItemsRemainCleanable() {
+        let category = CleanupCategory(
+            name: "Broken Links",
+            icon: "link",
+            color: .gray,
+            description: "Test",
+            group: .system,
+            safetyLevel: .review,
+            paths: ["/tmp/link"],
+            breakdown: [PathStat(path: "/tmp/link", size: 0, fileCount: 1)]
+        )
+        #expect(category.hasSelectedContent)
+    }
+
+    @Test func dockerPruneUsesCategoryLevelSelection() {
+        let category = CleanupCategory(
+            name: "Docker Dangling Images",
+            icon: "shippingbox",
+            color: .blue,
+            description: "Test",
+            group: .docker,
+            safetyLevel: .review,
+            paths: [],
+            breakdown: [PathStat(path: "sha256:abc", size: 100, fileCount: 1)],
+            isDockerResource: true
+        )
+        #expect(!category.hasPerFileSelection)
+    }
+
+    @Test func ollamaModelsSupportPerModelSelection() {
+        let category = CleanupCategory(
+            name: "Ollama Models",
+            icon: "brain",
+            color: .purple,
+            description: "Test",
+            group: .developer,
+            safetyLevel: .review,
+            paths: [],
+            breakdown: [
+                PathStat(path: "model-a:latest", size: 100, fileCount: 1),
+                PathStat(
+                    path: "model-b:latest",
+                    size: 200,
+                    fileCount: 1,
+                    isSelected: false
+                ),
+            ],
+            isOllamaResource: true
+        )
+        #expect(category.hasPerFileSelection)
+        #expect(category.selectedFileCount == 1)
+        #expect(category.selectedSize == 100)
     }
 
     @MainActor @Test func sidebarItemEquality() {
@@ -317,6 +427,16 @@ struct DockerSizeParserTests {
     @Test func parseDockerSizeInvalid() {
         #expect(CleanupManager.parseDockerSize("") == 0)
         #expect(CleanupManager.parseDockerSize("invalid") == 0)
+    }
+
+    @Test func parseDockerReclaimedSizeFromPruneOutput() {
+        let output = """
+        Deleted Images:
+        deleted: sha256:abc123
+        Total reclaimed space: 1.25GB
+        """
+        #expect(CleanupManager.parseDockerReclaimedSize(output) == 1_250_000_000)
+        #expect(CleanupManager.parseDockerReclaimedSize("Nothing to report") == nil)
     }
 }
 
@@ -486,6 +606,124 @@ struct BrokenSymlinkScanTests {
     }
 }
 
+// MARK: - JavaScript Project Artifact Tests
+
+struct JavaScriptProjectArtifactTests {
+
+    private func makeFixture() -> (URL, () -> Void) {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent(
+                "sparkclean-js-artifacts-\(ProcessInfo.processInfo.globallyUniqueString)"
+            )
+        try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        return (root, { try? fm.removeItem(at: root) })
+    }
+
+    @Test func nodeModulesIncludesNarrowClaudeWorktreeException() {
+        let (root, cleanup) = makeFixture()
+        defer { cleanup() }
+        let fm = FileManager.default
+        let dependency = root.appendingPathComponent(
+            "repo/.claude/worktrees/agent-a/node_modules/pkg/index.js"
+        )
+        try? fm.createDirectory(
+            at: dependency.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        fm.createFile(atPath: dependency.path, contents: Data("x".utf8))
+
+        var found: [String] = []
+        var breakdown: [PathStat] = []
+        var totalSize: Int64 = 0
+        var totalCount = 0
+        CleanupManager.findNodeModulesRecursive(
+            in: root.path,
+            depth: 0,
+            maxDepth: 6,
+            fm: fm,
+            found: &found,
+            breakdown: &breakdown,
+            totalSize: &totalSize,
+            totalCount: &totalCount,
+            minSize: 0
+        )
+
+        #expect(found.count == 1)
+        #expect(found.first?.hasSuffix(
+            "/.claude/worktrees/agent-a/node_modules"
+        ) == true)
+        #expect(totalSize > 0)
+    }
+
+    @Test func nextJSFinderRequiresPackageManifestAndSkipsNodeModules() {
+        let (root, cleanup) = makeFixture()
+        defer { cleanup() }
+        let fm = FileManager.default
+
+        let project = root.appendingPathComponent("project")
+        let nextFile = project.appendingPathComponent(".next/cache/data.bin")
+        try? fm.createDirectory(
+            at: nextFile.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        fm.createFile(
+            atPath: project.appendingPathComponent("package.json").path,
+            contents: Data("{}".utf8)
+        )
+        fm.createFile(atPath: nextFile.path, contents: Data("build".utf8))
+
+        let falsePositive = root.appendingPathComponent(
+            "no-manifest/.next/data.bin"
+        )
+        try? fm.createDirectory(
+            at: falsePositive.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        fm.createFile(
+            atPath: falsePositive.path,
+            contents: Data("keep".utf8)
+        )
+
+        let dependencyBuild = root.appendingPathComponent(
+            "node_modules/pkg/.next/data.bin"
+        )
+        try? fm.createDirectory(
+            at: dependencyBuild.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        fm.createFile(
+            atPath: root.appendingPathComponent(
+                "node_modules/pkg/package.json"
+            ).path,
+            contents: Data("{}".utf8)
+        )
+        fm.createFile(
+            atPath: dependencyBuild.path,
+            contents: Data("keep".utf8)
+        )
+
+        var found: [String] = []
+        var breakdown: [PathStat] = []
+        var totalSize: Int64 = 0
+        var totalCount = 0
+        CleanupManager.findNextJSBuildArtifactsRecursive(
+            in: root.path,
+            depth: 0,
+            maxDepth: 8,
+            fm: fm,
+            found: &found,
+            breakdown: &breakdown,
+            totalSize: &totalSize,
+            totalCount: &totalCount,
+            minSize: 0
+        )
+
+        #expect(found == [project.appendingPathComponent(".next").path])
+        #expect(totalSize > 0)
+    }
+}
+
 // MARK: - Performance Guards (F15)
 
 /// Coarse regression guards — they fail only on gross slowdowns, so they're stable in
@@ -592,6 +830,116 @@ struct StorageInsightsTests {
         let mgr = StorageInsightsManager()
         #expect(!mgr.items.isEmpty)
     }
+
+    @Test func whatsappInsightCoversSharedAndAppContainers() {
+        let item = StorageInsightsManager.defaultRegistry().first {
+            $0.id == "whatsapp"
+        }
+        #expect(item != nil)
+        #expect(item?.templatePaths.contains {
+            $0.hasSuffix(
+                "/Library/Group Containers/group.net.whatsapp.WhatsApp.shared"
+            )
+        } == true)
+        #expect(item?.templatePaths.contains {
+            $0.hasSuffix("/Library/Containers/net.whatsapp.WhatsApp")
+        } == true)
+        #expect(item?.templatePaths.count == 8)
+    }
+
+    @Test func boundedMeasurementReportsIncompleteAtWatchdog() {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-insight-watchdog-\(ProcessInfo.processInfo.globallyUniqueString)")
+        try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        fm.createFile(
+            atPath: root.appendingPathComponent("one.dat").path,
+            contents: Data(repeating: 1, count: 16)
+        )
+        defer { try? fm.removeItem(at: root) }
+
+        let measurement = StorageInsightsManager.measureAllocatedSize(
+            root.path,
+            maximumEntries: 1
+        )
+        #expect(!measurement.complete)
+    }
+}
+
+// MARK: - Scan Audit Tests
+
+struct ScanAuditLoggerTests {
+
+    @Test func latestScanSnapshotIsAtomicPrivateAndDecodable() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory
+            .appendingPathComponent(
+                "sparkclean-scan-audit-\(ProcessInfo.processInfo.globallyUniqueString)"
+            )
+        let file = directory.appendingPathComponent("latest-scan.json")
+        defer { try? fm.removeItem(at: directory) }
+
+        let snapshot = ScanAuditSnapshot(
+            schemaVersion: 1,
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            appVersion: "1.4.0",
+            scope: "All Categories",
+            wasPartial: false,
+            scanDuration: 2.5,
+            scanErrors: [],
+            settings: ["scanNodeModules": "true"],
+            diskUsage: .init(
+                totalSpace: 100,
+                usedSpace: 80,
+                freeSpace: 20,
+                purgeableSpace: 0
+            ),
+            categories: [
+                .init(
+                    name: "WhatsApp Chat Media",
+                    group: CategoryGroup.applications.rawValue,
+                    safetyLevel: SafetyLevel.caution.rawValue,
+                    description: "Media",
+                    cleanupWarning: "Warning",
+                    size: 90,
+                    fileCount: 3,
+                    isSelected: false,
+                    selectedSize: 90,
+                    selectedFileCount: 3,
+                    paths: ["/tmp/media"],
+                    allowedRoots: ["/tmp/media"],
+                    excludedPaths: [],
+                    associatedBundleIDs: ["net.whatsapp.WhatsApp"],
+                    deleteChildrenOnly: true,
+                    allowsBreakdownSelection: false,
+                    entries: [
+                        .init(
+                            path: "/tmp/media",
+                            size: 90,
+                            fileCount: 3,
+                            isSelected: true,
+                            displayName: "Media"
+                        ),
+                    ]
+                ),
+            ]
+        )
+
+        let logger = ScanAuditLogger(fileURL: file)
+        #expect(logger.write(snapshot))
+
+        let data = try Data(contentsOf: file)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(ScanAuditSnapshot.self, from: data)
+        #expect(decoded.schemaVersion == 1)
+        #expect(decoded.categories.first?.name == "WhatsApp Chat Media")
+
+        let permissions = try fm.attributesOfItem(atPath: file.path)[
+            .posixPermissions
+        ] as? NSNumber
+        #expect(permissions?.intValue == 0o600)
+    }
 }
 
 // MARK: - Time Machine Tests (F14)
@@ -615,6 +963,21 @@ struct TimeMachineTests {
     @Test func parseHandlesEmptyAndGarbage() {
         #expect(TimeMachineManager.parseLocalSnapshots("").isEmpty)
         #expect(TimeMachineManager.parseLocalSnapshots("No snapshots\nrandom text").isEmpty)
+        #expect(TimeMachineManager.parseLocalSnapshots(
+            "com.apple.TimeMachine.2026-02-31-093012.local"
+        ).isEmpty)
+    }
+
+    @Test func newestSnapshotDoesNotDependOnInputOrder() {
+        let snapshots = TimeMachineManager.parseLocalSnapshots("""
+        com.apple.TimeMachine.2026-06-30-120000.local
+        com.apple.TimeMachine.2026-07-02-090000.local
+        com.apple.TimeMachine.2026-07-01-093012.local
+        """)
+        #expect(
+            TimeMachineManager.newestSnapshotID(in: snapshots) ==
+                "com.apple.TimeMachine.2026-07-02-090000.local"
+        )
     }
 
     @Test func extractsDeletionTimestamp() {
@@ -626,6 +989,8 @@ struct TimeMachineTests {
 
     @Test func timestampValidatorGuardsAgainstInjection() {
         #expect(TimeMachineManager.isValidTimestamp("2026-07-01-093012"))
+        #expect(!TimeMachineManager.isValidTimestamp("2026-02-31-093012"))
+        #expect(!TimeMachineManager.isValidTimestamp("2026-13-01-093012"))
         #expect(!TimeMachineManager.isValidTimestamp("2026-07-01-093012'; rm -rf /"))
         #expect(!TimeMachineManager.isValidTimestamp("../../etc"))
         #expect(!TimeMachineManager.isValidTimestamp(""))
@@ -718,6 +1083,183 @@ struct RustTargetScanTests {
     }
 }
 
+// MARK: - Electron cache scan tests
+
+struct ElectronCacheScanTests {
+
+    @Test func findsOnlyDirectKnownCacheDirectoriesAndHonorsClaims() {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-electron-\(ProcessInfo.processInfo.globallyUniqueString)")
+        let claimedApp = root.appendingPathComponent("Claimed App")
+        let visibleCache = root.appendingPathComponent("Visible App/Code Cache")
+        let nestedCache = root.appendingPathComponent("Visible App/User Data/Cache")
+        let unrelated = root.appendingPathComponent("Visible App/Session Storage")
+        for file in [
+            claimedApp.appendingPathComponent("Cache/data.bin"),
+            visibleCache.appendingPathComponent("data.bin"),
+            nestedCache.appendingPathComponent("data.bin"),
+            unrelated.appendingPathComponent("data.bin"),
+        ] {
+            try? fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            fm.createFile(atPath: file.path, contents: Data("x".utf8))
+        }
+        defer { try? fm.removeItem(at: root) }
+
+        let found = CleanupManager.findElectronCacheDirectories(
+            in: root.path,
+            claimedPaths: [claimedApp.path],
+            isCancelled: { false },
+            minimumSize: 0
+        )
+        let paths = Set(found.map(\.path))
+        #expect(paths == Set([visibleCache.path]))
+        #expect(!paths.contains(nestedCache.path))
+        #expect(!paths.contains(unrelated.path))
+    }
+}
+
+// MARK: - Duplicate Finder model tests
+
+struct DuplicateFinderModelTests {
+
+    @Test func similarImageGroupKeepsLargestFileFirst() {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-similar-\(ProcessInfo.processInfo.globallyUniqueString)")
+        try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        let small = root.appendingPathComponent("small.jpg")
+        let large = root.appendingPathComponent("large.jpg")
+        fm.createFile(atPath: small.path, contents: Data(repeating: 1, count: 10))
+        fm.createFile(atPath: large.path, contents: Data(repeating: 1, count: 30))
+        defer { try? fm.removeItem(at: root) }
+
+        let group = DuplicateGroup(
+            fileName: "ignored.jpg",
+            fileSize: 30,
+            paths: [small.path, large.path],
+            isSimilarImage: true
+        )
+        #expect(group.paths.first == large.path)
+        #expect(group.fileName == "large.jpg")
+        #expect(group.wastedSize == 10)
+    }
+}
+
+// MARK: - Temporary file scan tests
+
+struct StaleTemporaryFileScanTests {
+
+    @Test func includesOnlyOldDirectRegularFiles() {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-stale-temp-\(ProcessInfo.processInfo.globallyUniqueString)")
+        try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let referenceDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let oldDate = referenceDate.addingTimeInterval(-10 * 86_400)
+        let threshold = referenceDate.addingTimeInterval(-7 * 86_400)
+        let oldFile = root.appendingPathComponent("old.tmp")
+        let recentFile = root.appendingPathComponent("recent.tmp")
+        let oldDirectory = root.appendingPathComponent("old-directory")
+        let nestedFile = oldDirectory.appendingPathComponent("nested.tmp")
+        let oldSymlink = root.appendingPathComponent("old-link")
+
+        fm.createFile(atPath: oldFile.path, contents: Data(repeating: 1, count: 32))
+        fm.createFile(atPath: recentFile.path, contents: Data(repeating: 2, count: 32))
+        try? fm.createDirectory(at: oldDirectory, withIntermediateDirectories: true)
+        fm.createFile(atPath: nestedFile.path, contents: Data(repeating: 3, count: 32))
+        try? fm.createSymbolicLink(atPath: oldSymlink.path, withDestinationPath: oldFile.path)
+        try? fm.setAttributes([.modificationDate: oldDate], ofItemAtPath: oldFile.path)
+        try? fm.setAttributes([.modificationDate: referenceDate], ofItemAtPath: recentFile.path)
+        try? fm.setAttributes([.modificationDate: oldDate], ofItemAtPath: oldDirectory.path)
+
+        let result = CleanupManager.findStaleTemporaryFiles(
+            roots: [root.path],
+            olderThan: threshold,
+            maximumEntries: 100
+        )
+
+        #expect(result.breakdown.count == 1)
+        #expect(
+            result.breakdown.first?.fileIdentity ==
+                FileRemover.fileIdentity(at: oldFile.path)
+        )
+        #expect(!result.wasCancelled)
+        #expect(!result.hitWatchdog)
+    }
+}
+
+// MARK: - Old Downloads directory tests
+
+struct OldDownloadsDirectoryTests {
+
+    @Test func requiresEveryFileIncludingHiddenFilesToBeOld() {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-old-download-\(ProcessInfo.processInfo.globallyUniqueString)")
+        try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let threshold = Date(timeIntervalSince1970: 1_800_000_000)
+        let oldFile = root.appendingPathComponent("old.bin")
+        let recentHiddenFile = root.appendingPathComponent(".recent.bin")
+        fm.createFile(atPath: oldFile.path, contents: Data(repeating: 1, count: 16))
+        fm.createFile(
+            atPath: recentHiddenFile.path,
+            contents: Data(repeating: 2, count: 16)
+        )
+        try? fm.setAttributes(
+            [.modificationDate: threshold.addingTimeInterval(-86_400)],
+            ofItemAtPath: oldFile.path
+        )
+        try? fm.setAttributes(
+            [.modificationDate: threshold.addingTimeInterval(86_400)],
+            ofItemAtPath: recentHiddenFile.path
+        )
+
+        #expect(CleanupManager.oldDirectoryContentStat(
+            root.path,
+            olderThan: threshold
+        ) == nil)
+    }
+
+    @Test func returnsAStatOnlyAfterACompleteBoundedWalk() {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-old-download-\(ProcessInfo.processInfo.globallyUniqueString)")
+        try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let threshold = Date(timeIntervalSince1970: 1_800_000_000)
+        for name in ["one.bin", "two.bin"] {
+            let file = root.appendingPathComponent(name)
+            fm.createFile(
+                atPath: file.path,
+                contents: Data(repeating: 1, count: 16)
+            )
+            try? fm.setAttributes(
+                [.modificationDate: threshold.addingTimeInterval(-86_400)],
+                ofItemAtPath: file.path
+            )
+        }
+
+        let complete = CleanupManager.oldDirectoryContentStat(
+            root.path,
+            olderThan: threshold,
+            maximumEntries: 10
+        )
+        #expect(complete?.1 == 2)
+        #expect((complete?.0 ?? 0) > 0)
+        #expect(CleanupManager.oldDirectoryContentStat(
+            root.path,
+            olderThan: threshold,
+            maximumEntries: 1
+        ) == nil)
+    }
+}
+
 // MARK: - DeletionPolicy Tests (safety-critical)
 
 /// Characterization tests: these encode the exact verdicts the historical
@@ -730,7 +1272,8 @@ struct DeletionPolicyTests {
 
     @Test func rejectsSystemRoots() {
         for path in ["/", "/System", "/usr", "/bin", "/sbin", "/var", "/etc",
-                     "/tmp", "/private", "/Applications", "/Library", "/Users"] {
+                     "/tmp", "/private", "/Applications", "/Library", "/Users",
+                     "/Volumes"] {
             #expect(!policy.isSafeToDelete(path), "should reject \(path)")
         }
     }
@@ -754,7 +1297,8 @@ struct DeletionPolicyTests {
 
     @Test func rejectsForbiddenPrefixes() {
         for path in ["/System/Library/Foo", "/usr/local/bin/foo", "/bin/ls",
-                     "/sbin/reboot", "/private/var/db/something"] {
+                     "/sbin/reboot", "/Volumes/External/file",
+                     "/private/var/db/something"] {
             #expect(!policy.isSafeToDelete(path), "should reject \(path)")
         }
     }
@@ -763,6 +1307,19 @@ struct DeletionPolicyTests {
         // Fewer than 3 path components after resolution.
         #expect(!policy.isSafeToDelete("/foo"))
         #expect(!policy.isSafeToDelete("/foo/bar"))
+    }
+
+    @Test func rejectsDirectUserHomeItemsUnlessExplicitlyProfiled() {
+        #expect(!policy.isSafeToDelete("/Users/testuser/random"))
+        #expect(!policy.isSafeToDelete("/Users/Shared/random"))
+
+        let shellHistory = DeletionPolicy(
+            home: "/Users/testuser",
+            allowsDirectHomeItems: true
+        )
+        #expect(shellHistory.isSafeToDelete("/Users/testuser/.zsh_history"))
+        #expect(!shellHistory.isSafeToDelete("/Users/someoneelse/.zsh_history"))
+        #expect(!shellHistory.isSafeToDelete("/Users/Shared/random"))
     }
 
     @Test func acceptsLegitimateCacheTargets() {
@@ -788,6 +1345,7 @@ struct DeletionPolicyTests {
     @Test func rejectsCloudStorageAndICloud() {
         #expect(!policy.isSafeToDelete("/Users/testuser/Library/CloudStorage"))
         #expect(!policy.isSafeToDelete("/Users/testuser/Library/CloudStorage/Dropbox/file.txt"))
+        #expect(!policy.isSafeToDelete("/users/testuser/library/cloudstorage/Dropbox/file.txt"))
         #expect(!policy.isSafeToDelete("/Users/testuser/Library/Mobile Documents/com~apple~x/y"))
     }
 
@@ -799,8 +1357,10 @@ struct DeletionPolicyTests {
 
     @Test func rejectsLibraryDocumentBundles() {
         for path in ["/Users/testuser/Pictures/My.photoslibrary/database/x",
+                     "/Users/testuser/Pictures/Upper.PHOTOSLIBRARY/database/x",
                      "/Users/testuser/Music/My.musiclibrary",
                      "/Users/testuser/Movies/Project.fcpbundle/render/x",
+                     "/Users/testuser/Music/MySong.band/Alternatives/000",
                      "/Users/testuser/Library/Keychains/login.keychain-db"] {
             #expect(!policy.isSafeToDelete(path), "should reject \(path)")
         }
@@ -813,10 +1373,40 @@ struct DeletionPolicyTests {
         #expect(!policy.isSafeToDelete("/Users/testuser/Library/LaunchAgents/com.foo.plist"))
     }
 
+    @Test func rejectsProtectedDataStoreContents() {
+        for path in [
+            "/Users/testuser/Library/Keychains/metadata.keychain",
+            "/Users/testuser/Library/Mail/V10/MailData/Envelope Index",
+            "/Users/testuser/Library/Accounts/Accounts4.sqlite",
+            "/Users/testuser/.ssh/id_ed25519",
+            "/Users/testuser/.gnupg/private-keys-v1.d/key.key",
+        ] {
+            #expect(!policy.isSafeToDelete(path), "should reject \(path)")
+        }
+    }
+
+    @Test func privateNamespaceAllowsOnlySanctionedTemporaryItems() {
+        for path in [
+            "/private/etc/passwd",
+            "/etc/passwd",
+            "/var/log/system.log",
+            "/private/var/folders/not-this-app/file",
+        ] {
+            #expect(!policy.isSafeToDelete(path), "should reject \(path)")
+        }
+
+        #expect(policy.isSafeToDelete("/tmp/sparkclean-old-temp-file"))
+        #expect(policy.isSafeToDelete("/private/var/tmp/sparkclean-old-temp-file"))
+        let ownTemporaryItem = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sparkclean-policy-fixture").path
+        #expect(policy.isSafeToDelete(ownTemporaryItem))
+    }
+
     @Test func applicationBundleProfilePermitsWholeBundles() {
         let uninstaller = DeletionPolicy(home: "/Users/testuser", allowsApplicationBundles: true)
         // Default policy rejects a depth-2 app bundle; the uninstaller profile allows it.
         #expect(!policy.isSafeToDelete("/Applications/Foo.app"))
+        #expect(!policy.isSafeToDelete("/Users/testuser/Applications/Bar.app"))
         #expect(uninstaller.isSafeToDelete("/Applications/Foo.app"))
         #expect(uninstaller.isSafeToDelete("/Users/testuser/Applications/Bar.app"))
         // Even the uninstaller must not delete the *interior* of a bundle, nor system apps.
@@ -854,8 +1444,17 @@ struct DeletionPolicyTests {
                                             roots: ["/Users/testuser/Caches"]))
     }
 
-    @Test func emptyRootsImposesNoConstraint() {
-        #expect(policy.isWithinAllowedRoots("/anything/at/all", roots: []))
+    @Test func emptyRootsAreRejected() {
+        #expect(!policy.isWithinAllowedRoots("/anything/at/all", roots: []))
+        #expect(!policy.validate("/Users/testuser/Library/Caches/x", allowedRoots: []))
+    }
+
+    @Test func relativePathsAreRejected() {
+        #expect(!policy.isSafeToDelete("Library/Caches/item"))
+        #expect(!policy.validate(
+            "Library/Caches/item",
+            allowedRoots: ["Library/Caches"]
+        ))
     }
 
     @Test func validateCombinesSafetyAndTerritory() {
@@ -892,6 +1491,52 @@ struct DeletionPolicyTests {
         let realChild = cacheDir.appendingPathComponent("real.db")
         fm.createFile(atPath: realChild.path, contents: Data("x".utf8))
         #expect(live.validate(realChild.path, allowedRoots: [cacheDir.path]))
+    }
+
+    @Test func explicitBrokenLinkProfileRemovesOnlyTheLinkLocation() {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-link-profile-\(ProcessInfo.processInfo.globallyUniqueString)")
+        let scanRoot = base.appendingPathComponent("scan-root")
+        let link = scanRoot.appendingPathComponent("broken")
+        try? fm.createDirectory(at: scanRoot, withIntermediateDirectories: true)
+        try? fm.createSymbolicLink(
+            atPath: link.path,
+            withDestinationPath: "/definitely/missing/outside-scan-root"
+        )
+        defer { try? fm.removeItem(at: base) }
+
+        let strict = DeletionPolicy()
+        let brokenLinks = DeletionPolicy(allowsSymbolicLinkItems: true)
+        #expect(!strict.validate(link.path, allowedRoots: [scanRoot.path]))
+        #expect(brokenLinks.validate(link.path, allowedRoots: [scanRoot.path]))
+        // A symlink cannot become the traversal root for either profile.
+        #expect(!brokenLinks.isStableAllowedRoot(link.path))
+    }
+
+    @Test func validateRejectsSymlinkedAllowedRoot() {
+        let fm = FileManager.default
+        let live = DeletionPolicy(home: NSHomeDirectory())
+        let base = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-root-link-\(ProcessInfo.processInfo.globallyUniqueString)")
+        let actual = base.appendingPathComponent("Documents")
+        let declaredCache = base.appendingPathComponent("Caches")
+        try? fm.createDirectory(at: actual, withIntermediateDirectories: true)
+        fm.createFile(
+            atPath: actual.appendingPathComponent("precious.txt").path,
+            contents: Data("keep".utf8)
+        )
+        try? fm.createSymbolicLink(
+            atPath: declaredCache.path,
+            withDestinationPath: actual.path
+        )
+        defer { try? fm.removeItem(at: base) }
+
+        #expect(!live.isStableAllowedRoot(declaredCache.path))
+        #expect(!live.validate(
+            declaredCache.appendingPathComponent("precious.txt").path,
+            allowedRoots: [declaredCache.path]
+        ))
     }
 
     @Test func rejectsSymlinkEscapeIntoProtectedDir() {
@@ -989,6 +1634,89 @@ struct FileRemoverTests {
         }
     }
 
+    @Test func blocksEmptyTerritory() {
+        let (base, _, cleanup) = makeSandbox()
+        defer { cleanup() }
+        let file = base.appendingPathComponent("unowned.txt")
+        FileManager.default.createFile(atPath: file.path, contents: Data("x".utf8))
+
+        let result = FileRemover(useTrash: false).remove(file.path, allowedRoots: [])
+        guard case .blocked = result else {
+            Issue.record("expected .blocked, got \(result)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func blocksItemWhoseTypeChangedSinceScan() {
+        let (base, _, cleanup) = makeSandbox()
+        defer { cleanup() }
+        let item = base.appendingPathComponent("was-a-file")
+        try? FileManager.default.createDirectory(at: item, withIntermediateDirectories: true)
+
+        let result = FileRemover(useTrash: false).remove(
+            item.path,
+            allowedRoots: [base.path],
+            expectedIsDirectory: false
+        )
+        guard case .blocked = result else {
+            Issue.record("expected .blocked, got \(result)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: item.path))
+    }
+
+    @Test func removesDanglingSymlinkItself() {
+        let (base, trash, cleanup) = makeSandbox()
+        defer { cleanup() }
+        let link = base.appendingPathComponent("broken-link")
+        try? FileManager.default.createSymbolicLink(
+            atPath: link.path,
+            withDestinationPath: base.appendingPathComponent("missing-target").path
+        )
+
+        let result = FileRemover(
+            policy: DeletionPolicy(allowsSymbolicLinkItems: true),
+            useTrash: true,
+            trashStrategy: fixtureTrash(trash)
+        ).remove(link.path, allowedRoots: [base.path], expectedIsDirectory: false)
+
+        guard case let .removed(removal) = result else {
+            Issue.record("expected .removed, got \(result)")
+            return
+        }
+        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)) == nil)
+        #expect(
+            (try? FileManager.default.destinationOfSymbolicLink(
+                atPath: removal.trashedPath ?? ""
+            )) != nil
+        )
+    }
+
+    @Test func blocksDifferentItemSwappedIntoScannedPath() {
+        let (base, _, cleanup) = makeSandbox()
+        defer { cleanup() }
+        let item = base.appendingPathComponent("replaceable.txt")
+        let replacement = base.appendingPathComponent("replacement.txt")
+        FileManager.default.createFile(atPath: item.path, contents: Data("old".utf8))
+        FileManager.default.createFile(atPath: replacement.path, contents: Data("new".utf8))
+        let identity = FileRemover.fileIdentity(at: item.path)
+        try? FileManager.default.removeItem(at: item)
+        try? FileManager.default.moveItem(at: replacement, to: item)
+
+        let result = FileRemover(useTrash: false).remove(
+            item.path,
+            allowedRoots: [base.path],
+            expectedIsDirectory: false,
+            expectedIdentity: identity
+        )
+        guard case .blocked = result else {
+            Issue.record("expected .blocked, got \(result)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: item.path))
+    }
+
     @Test func permanentDeleteRemovesFile() {
         let (base, _, cleanup) = makeSandbox()
         defer { cleanup() }
@@ -1009,6 +1737,53 @@ struct FileRemoverTests {
     }
 }
 
+// MARK: - Uninstaller Safety Tests
+
+struct UninstallerSafetyTests {
+
+    @Test func crashReportsRequireAnIdentifierBoundary() {
+        #expect(UninstallerManager.crashReportMatches(
+            fileName: "Arc_2026-07-20-120000_Mac.ips",
+            appName: "Arc",
+            bundleID: "company.thebrowser.Browser"
+        ))
+        #expect(UninstallerManager.crashReportMatches(
+            fileName: "company.thebrowser.Browser-2026-07-20.crash",
+            appName: "Arc",
+            bundleID: "company.thebrowser.Browser"
+        ))
+        #expect(!UninstallerManager.crashReportMatches(
+            fileName: "Archive Utility_2026-07-20.ips",
+            appName: "Arc",
+            bundleID: "company.thebrowser.Browser"
+        ))
+        #expect(!UninstallerManager.crashReportMatches(
+            fileName: "unrelated.ips",
+            appName: "",
+            bundleID: ""
+        ))
+    }
+
+    @Test func groupContainersRequireBundleIdentifierBoundaries() {
+        #expect(UninstallerManager.identifierBoundaryMatch(
+            containerName: "TEAMID.group.com.example.app.shared",
+            bundleID: "com.example.app"
+        ))
+        #expect(UninstallerManager.identifierBoundaryMatch(
+            containerName: "com.example.app",
+            bundleID: "com.example.app"
+        ))
+        #expect(!UninstallerManager.identifierBoundaryMatch(
+            containerName: "TEAMID.group.com.example.application.shared",
+            bundleID: "com.example.app"
+        ))
+        #expect(!UninstallerManager.identifierBoundaryMatch(
+            containerName: "prefixcom.example.app",
+            bundleID: "com.example.app"
+        ))
+    }
+}
+
 // MARK: - CleanupManifest / Undo Tests
 
 struct CleanupManifestTests {
@@ -1023,7 +1798,10 @@ struct CleanupManifestTests {
     @Test func saveAndReadBackRoundTrips() {
         let (dir, cleanup) = makeStoreDir()
         defer { cleanup() }
-        let store = CleanupManifestStore(directory: dir)
+        let store = CleanupManifestStore(
+            directory: dir,
+            trustedTrashRoots: [dir.path]
+        )
         var manifest = CleanupManifest(sessionID: "abc", appVersion: "1.4.0", trashMode: true)
         manifest.entries.append(.init(originalPath: "/a/b", trashedPath: "/t/b", size: 10, category: "Cache"))
         store.save(manifest)
@@ -1044,15 +1822,20 @@ struct CleanupManifestTests {
         try? fm.createDirectory(at: trashed.deletingLastPathComponent(), withIntermediateDirectories: true)
         fm.createFile(atPath: trashed.path, contents: Data("data".utf8))
 
-        let store = CleanupManifestStore(directory: dir)
+        let store = CleanupManifestStore(
+            directory: dir,
+            trustedTrashRoots: [dir.path]
+        )
         var manifest = CleanupManifest(sessionID: "s1", appVersion: "1.4.0", trashMode: true)
         manifest.entries.append(.init(originalPath: original.path, trashedPath: trashed.path,
                                       size: 4, category: "Cache"))
+        store.save(manifest)
 
         let outcome = store.restore(manifest)
         #expect(outcome.restored == 1)
         #expect(fm.fileExists(atPath: original.path))       // moved back (dirs created)
         #expect(!fm.fileExists(atPath: trashed.path))       // gone from trash
+        #expect(store.mostRecent() == nil)                  // consumed, not offered again
     }
 
     @Test func restoreSkipsWhenOriginalExists() {
@@ -1066,27 +1849,216 @@ struct CleanupManifestTests {
         fm.createFile(atPath: trashed.path, contents: Data("old".utf8))
         fm.createFile(atPath: original.path, contents: Data("new".utf8))  // already occupied
 
-        let store = CleanupManifestStore(directory: dir)
+        let store = CleanupManifestStore(
+            directory: dir,
+            trustedTrashRoots: [dir.path]
+        )
         var manifest = CleanupManifest(sessionID: "s2", appVersion: "1.4.0", trashMode: true)
         manifest.entries.append(.init(originalPath: original.path, trashedPath: trashed.path,
                                       size: 3, category: "Cache"))
+        store.save(manifest)
 
         let outcome = store.restore(manifest)
         #expect(outcome.skippedExisting == 1)
         #expect(outcome.restored == 0)
         #expect(fm.fileExists(atPath: trashed.path))  // not moved
+        #expect(store.mostRecent()?.entries.count == 1) // conflict remains retryable
     }
 
     @Test func restoreReportsMissingTrashItem() {
         let (dir, cleanup) = makeStoreDir()
         defer { cleanup() }
-        let store = CleanupManifestStore(directory: dir)
+        let store = CleanupManifestStore(
+            directory: dir,
+            trustedTrashRoots: [dir.path]
+        )
         var manifest = CleanupManifest(sessionID: "s3", appVersion: "1.4.0", trashMode: true)
         manifest.entries.append(.init(originalPath: dir.appendingPathComponent("x").path,
                                       trashedPath: dir.appendingPathComponent("nope").path,
                                       size: 0, category: "Cache"))
         let outcome = store.restore(manifest)
         #expect(outcome.missingInTrash == 1)
+    }
+
+    @Test func restoreMovesDanglingSymlinkBack() {
+        let (dir, cleanup) = makeStoreDir()
+        defer { cleanup() }
+        let fm = FileManager.default
+        let trashed = dir.appendingPathComponent("trash/broken-link")
+        let original = dir.appendingPathComponent("home/broken-link")
+        try? fm.createDirectory(
+            at: trashed.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try? fm.createSymbolicLink(
+            atPath: trashed.path,
+            withDestinationPath: "/definitely/missing/sparkclean-target"
+        )
+
+        let store = CleanupManifestStore(
+            directory: dir,
+            trustedTrashRoots: [dir.path]
+        )
+        var manifest = CleanupManifest(
+            sessionID: "broken-link",
+            appVersion: "1.4.0",
+            trashMode: true
+        )
+        manifest.entries.append(.init(
+            originalPath: original.path,
+            trashedPath: trashed.path,
+            size: 0,
+            category: "Broken Symlinks"
+        ))
+        store.save(manifest)
+
+        let outcome = store.restore(manifest)
+        #expect(outcome.restored == 1)
+        #expect((try? fm.destinationOfSymbolicLink(atPath: original.path)) != nil)
+        #expect((try? fm.destinationOfSymbolicLink(atPath: trashed.path)) == nil)
+    }
+
+    @Test func restoreRejectsEditedPathsOutsideTheTrustedTrashRoot() {
+        let (dir, cleanup) = makeStoreDir()
+        defer { cleanup() }
+        let fm = FileManager.default
+        let trustedTrash = dir.appendingPathComponent("trash")
+        let outside = dir.appendingPathComponent("outside/other.txt")
+        let original = dir.appendingPathComponent("home/other.txt")
+        try? fm.createDirectory(
+            at: outside.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        fm.createFile(atPath: outside.path, contents: Data("other".utf8))
+
+        let store = CleanupManifestStore(
+            directory: dir,
+            trustedTrashRoots: [trustedTrash.path]
+        )
+        let manifest = CleanupManifest(
+            sessionID: "edited",
+            appVersion: "1.4.0",
+            trashMode: true,
+            entries: [.init(
+                originalPath: original.path,
+                trashedPath: outside.path,
+                size: 5,
+                category: "Cache"
+            )]
+        )
+
+        let outcome = store.restore(manifest)
+        #expect(outcome.failed == 1)
+        #expect(fm.fileExists(atPath: outside.path))
+        #expect(!fm.fileExists(atPath: original.path))
+    }
+
+    @Test func restoreRejectsAnItemReplacedInsideTrash() {
+        let (dir, cleanup) = makeStoreDir()
+        defer { cleanup() }
+        let fm = FileManager.default
+        let trash = dir.appendingPathComponent("trash")
+        let trashed = trash.appendingPathComponent("file.txt")
+        let replacement = dir.appendingPathComponent("replacement.txt")
+        let original = dir.appendingPathComponent("home/file.txt")
+        try? fm.createDirectory(at: trash, withIntermediateDirectories: true)
+        fm.createFile(atPath: trashed.path, contents: Data("expected".utf8))
+        fm.createFile(atPath: replacement.path, contents: Data("replacement".utf8))
+        let reviewedIdentity = FileRemover.fileIdentity(at: trashed.path)
+        try? fm.removeItem(at: trashed)
+        try? fm.moveItem(at: replacement, to: trashed)
+
+        let store = CleanupManifestStore(
+            directory: dir,
+            trustedTrashRoots: [trash.path]
+        )
+        let manifest = CleanupManifest(
+            sessionID: "replaced",
+            appVersion: "1.4.0",
+            trashMode: true,
+            entries: [.init(
+                originalPath: original.path,
+                trashedPath: trashed.path,
+                size: 8,
+                category: "Cache",
+                device: reviewedIdentity?.device,
+                inode: reviewedIdentity?.inode
+            )]
+        )
+
+        let outcome = store.restore(manifest)
+        #expect(outcome.failed == 1)
+        #expect(fm.fileExists(atPath: trashed.path))
+        #expect(!fm.fileExists(atPath: original.path))
+    }
+
+    @Test func emptyCompletedSessionDoesNotExposeOlderUndoAsLatest() {
+        let (dir, cleanup) = makeStoreDir()
+        defer { cleanup() }
+        let store = CleanupManifestStore(directory: dir)
+        var older = CleanupManifest(sessionID: "older", appVersion: "1.4.0", trashMode: true)
+        older.entries.append(.init(
+            originalPath: "/old/original",
+            trashedPath: "/old/trash",
+            size: 1,
+            category: "Old"
+        ))
+        store.save(older)
+        try? FileManager.default.setAttributes(
+            [.modificationDate: Date.distantPast],
+            ofItemAtPath: dir.appendingPathComponent("manifest-older.json").path
+        )
+
+        let recorder = CleanupSessionRecorder(
+            sessionID: "new-empty",
+            appVersion: "1.4.0",
+            trashMode: false,
+            store: store
+        )
+        recorder.finish()
+
+        #expect(store.mostRecent()?.sessionID == "new-empty")
+        #expect(store.mostRecent()?.entries.isEmpty == true)
+    }
+
+    @Test func cloneAwareAccountingCountsSharedContentOnlyOnce() {
+        var accounting = CloneAwareSizeAccumulator()
+        accounting.add(
+            allocatedSize: 20_000_000,
+            mayShareFileContent: true,
+            fileContentIdentifier: 42
+        )
+        accounting.add(
+            allocatedSize: 20_000_000,
+            mayShareFileContent: true,
+            fileContentIdentifier: 42
+        )
+        accounting.add(
+            allocatedSize: 5_000_000,
+            mayShareFileContent: false,
+            fileContentIdentifier: 99
+        )
+
+        #expect(accounting.logicalAllocatedSize == 45_000_000)
+        #expect(accounting.estimatedUniqueSize == 25_000_000)
+        #expect(accounting.duplicateCloneReferences == 1)
+    }
+
+    @Test func cloneAwareAccountingUsesLargestSharedAllocation() {
+        var accounting = CloneAwareSizeAccumulator()
+        accounting.add(
+            allocatedSize: 8_192,
+            mayShareFileContent: true,
+            fileContentIdentifier: 7
+        )
+        accounting.add(
+            allocatedSize: 12_288,
+            mayShareFileContent: true,
+            fileContentIdentifier: 7
+        )
+
+        #expect(accounting.logicalAllocatedSize == 20_480)
+        #expect(accounting.estimatedUniqueSize == 12_288)
     }
 
     @Test func pruneKeepsRetentionCount() {

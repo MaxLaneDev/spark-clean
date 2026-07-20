@@ -18,6 +18,24 @@ struct CleanupManifestEntry: Codable, Equatable {
     let trashedPath: String
     let size: Int64
     let category: String
+    let device: UInt64?
+    let inode: UInt64?
+
+    init(
+        originalPath: String,
+        trashedPath: String,
+        size: Int64,
+        category: String,
+        device: UInt64? = nil,
+        inode: UInt64? = nil
+    ) {
+        self.originalPath = originalPath
+        self.trashedPath = trashedPath
+        self.size = size
+        self.category = category
+        self.device = device
+        self.inode = inode
+    }
 }
 
 struct CleanupManifest: Codable {
@@ -40,23 +58,64 @@ final class CleanupManifestStore {
     /// Maximum number of manifest files to retain.
     let retention: Int
     private let fm = FileManager.default
+    private let restorePolicy: DeletionPolicy
+    private let trustedTrashRoots: [String]
+    private let trustedDeviceIDs: Set<UInt64>
 
-    init(directory: URL? = nil, retention: Int = 10) {
+    init(
+        directory: URL? = nil,
+        retention: Int = 10,
+        restorePolicy: DeletionPolicy? = nil,
+        trustedTrashRoots: [String]? = nil
+    ) {
+        let policy = restorePolicy ?? DeletionPolicy(
+            allowsApplicationBundles: true,
+            allowsDirectHomeItems: true,
+            allowsSymbolicLinkItems: true
+        )
         self.directory = directory ?? URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Library/Application Support/SparkClean/manifests")
         self.retention = retention
+        self.restorePolicy = policy
+        self.trustedTrashRoots = trustedTrashRoots ?? [
+            URL(fileURLWithPath: policy.home)
+                .appendingPathComponent(".Trash", isDirectory: true).path,
+        ]
+        self.trustedDeviceIDs = Set(
+            [policy.home, "/"].compactMap {
+                FileRemover.fileIdentity(at: $0)?.device
+            }
+        )
     }
 
     private func url(for sessionID: String) -> URL {
-        directory.appendingPathComponent("manifest-\(sessionID).json")
+        let safeSessionID = sessionID.replacingOccurrences(
+            of: "[^A-Za-z0-9._-]",
+            with: "-",
+            options: .regularExpression
+        )
+        return directory.appendingPathComponent("manifest-\(safeSessionID).json")
+    }
+
+    func remove(sessionID: String) {
+        try? fm.removeItem(at: url(for: sessionID))
     }
 
     /// Persist (or overwrite) a manifest for its session. Safe to call repeatedly as
     /// entries accumulate — the file is rewritten atomically each time.
     func save(_ manifest: CleanupManifest) {
         try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? fm.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: directory.path
+        )
         guard let data = try? JSONEncoder().encode(manifest) else { return }
-        try? data.write(to: url(for: manifest.sessionID), options: .atomic)
+        let manifestURL = url(for: manifest.sessionID)
+        try? data.write(to: manifestURL, options: .atomic)
+        try? fm.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: manifestURL.path
+        )
     }
 
     /// All manifests, newest first (by file modification date).
@@ -104,16 +163,38 @@ final class CleanupManifestStore {
     @discardableResult
     func restore(_ manifest: CleanupManifest) -> RestoreOutcome {
         var outcome = RestoreOutcome()
+        var remainingEntries: [CleanupManifestEntry] = []
         for entry in manifest.entries {
             let trashed = URL(fileURLWithPath: entry.trashedPath)
             let original = URL(fileURLWithPath: entry.originalPath)
 
-            guard fm.fileExists(atPath: entry.trashedPath) else {
+            // Manifests are user-writable data, not authority. Refuse edited entries
+            // that point outside Trash, target protected locations, contain unstable
+            // path components, or use relative/noncanonical spellings.
+            guard isValidRestoreEntry(entry) else {
+                outcome.failed += 1
+                continue
+            }
+
+            // `fileExists` follows symlinks and returns false for a dangling link.
+            // Broken symlinks are a first-class cleanup result, so use lstat-backed
+            // identity checks for both Trash presence and destination occupancy.
+            guard itemExists(at: entry.trashedPath) else {
                 outcome.missingInTrash += 1
                 continue
             }
-            if fm.fileExists(atPath: entry.originalPath) {
+            if let device = entry.device, let inode = entry.inode,
+               FileRemover.fileIdentity(at: entry.trashedPath) != .init(
+                   device: device,
+                   inode: inode
+               ) {
+                outcome.failed += 1
+                remainingEntries.append(entry)
+                continue
+            }
+            if itemExists(at: entry.originalPath) {
                 outcome.skippedExisting += 1
+                remainingEntries.append(entry)
                 continue
             }
 
@@ -124,8 +205,119 @@ final class CleanupManifestStore {
                 outcome.restored += 1
             } catch {
                 outcome.failed += 1
+                remainingEntries.append(entry)
             }
         }
+
+        // Consume restored/missing entries so "Restore Last Cleanup" never offers a
+        // stale manifest forever. Keep only conflicts/failures that can be retried.
+        if remainingEntries.isEmpty {
+            remove(sessionID: manifest.sessionID)
+        } else {
+            var remaining = manifest
+            remaining.entries = remainingEntries
+            save(remaining)
+        }
         return outcome
+    }
+
+    private func itemExists(at path: String) -> Bool {
+        FileRemover.fileIdentity(at: path) != nil
+    }
+
+    private func isValidRestoreEntry(_ entry: CleanupManifestEntry) -> Bool {
+        guard (entry.originalPath as NSString).isAbsolutePath,
+              (entry.trashedPath as NSString).isAbsolutePath,
+              URL(fileURLWithPath: entry.originalPath).standardizedFileURL.path ==
+                  entry.originalPath,
+              URL(fileURLWithPath: entry.trashedPath).standardizedFileURL.path ==
+                  entry.trashedPath,
+              restorePolicy.isSafeToDelete(entry.originalPath),
+              restorePolicy.isStableAllowedRoot(entry.originalPath),
+              nearestExistingAncestorDevice(of: entry.originalPath).map({
+                  trustedDeviceIDs.contains($0)
+              }) == true
+        else { return false }
+
+        return trustedTrashRoots.contains {
+            restorePolicy.isWithinAllowedRoots(
+                entry.trashedPath,
+                roots: [$0]
+            )
+        }
+    }
+
+    private func nearestExistingAncestorDevice(of path: String) -> UInt64? {
+        var candidate = URL(fileURLWithPath: path).deletingLastPathComponent()
+        while true {
+            if let device = FileRemover.fileIdentity(at: candidate.path)?.device {
+                return device
+            }
+            let parent = candidate.deletingLastPathComponent()
+            if parent.path == candidate.path { return nil }
+            candidate = parent
+        }
+    }
+}
+
+/// Thread-safe session writer used by every deletion surface. Each successful Trash
+/// move is persisted immediately, so a crash halfway through a large category still
+/// leaves a complete undo record for everything already removed.
+final class CleanupSessionRecorder: @unchecked Sendable {
+    let sessionID: String
+
+    private let store: CleanupManifestStore
+    private let excludedOriginalRoot: String
+    private let lock = NSLock()
+    private var manifest: CleanupManifest
+
+    init(
+        sessionID: String = ProcessInfo.processInfo.globallyUniqueString,
+        appVersion: String,
+        trashMode: Bool,
+        store: CleanupManifestStore,
+        excludedOriginalRoot: String = NSHomeDirectory() + "/.Trash"
+    ) {
+        self.sessionID = sessionID
+        self.store = store
+        self.excludedOriginalRoot = excludedOriginalRoot
+        self.manifest = CleanupManifest(
+            sessionID: sessionID,
+            appVersion: appVersion,
+            trashMode: trashMode
+        )
+    }
+
+    func record(_ removal: FileRemover.Removal, category: String) {
+        guard let trashedPath = removal.trashedPath else { return }
+        let original = URL(fileURLWithPath: removal.originalPath).standardizedFileURL.path
+        let excluded = URL(fileURLWithPath: excludedOriginalRoot).standardizedFileURL.path
+        guard original != excluded, !original.hasPrefix(excluded + "/") else {
+            return
+        }
+
+        lock.lock()
+        manifest.entries.append(CleanupManifestEntry(
+            originalPath: removal.originalPath,
+            trashedPath: trashedPath,
+            size: removal.size,
+            category: category,
+            device: removal.fileIdentity?.device,
+            inode: removal.fileIdentity?.inode
+        ))
+        store.save(manifest)
+        lock.unlock()
+    }
+
+    func finish() {
+        lock.lock()
+        // Persist an empty completion marker when an operation removed nothing to
+        // Trash. Otherwise "Restore Last Cleanup" could incorrectly offer an older,
+        // unrelated session after a permanent-only or failed operation.
+        if manifest.entries.isEmpty {
+            store.save(manifest)
+        }
+        store.prune()
+        lock.unlock()
     }
 }

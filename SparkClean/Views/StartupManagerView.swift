@@ -34,10 +34,14 @@ struct StartupItem: Identifiable {
 class StartupManager {
     var items: [StartupItem] = []
     var isScanning = false
+    var togglingItemIDs = Set<UUID>()
+    var lastError: String?
 
     func scan() {
+        guard !isScanning else { return }
         isScanning = true
         items = []
+        lastError = nil
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
@@ -122,6 +126,10 @@ class StartupManager {
 
         let uid = getuid()
         let shouldDisable = item.isEnabled
+        let itemID = item.id
+        let displayName = item.displayName
+        togglingItemIDs.insert(itemID)
+        lastError = nil
 
         // Run launchctl on background thread to avoid blocking UI
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -132,9 +140,17 @@ class StartupManager {
                 result = CleanupManager.runCommand("/bin/launchctl", arguments: ["bootstrap", "gui/\(uid)", plistPath])
             }
             DispatchQueue.main.async {
-                // Only update toggle if launchctl succeeded (non-nil result means exit code 0)
+                self?.togglingItemIDs.remove(itemID)
+                // Resolve by stable row ID: a rescan can reorder or replace the array
+                // while launchctl is running, so the captured index is no longer safe.
                 if result != nil {
-                    self?.items[index].isEnabled = !shouldDisable
+                    if let currentIndex = self?.items.firstIndex(where: {
+                        $0.id == itemID
+                    }) {
+                        self?.items[currentIndex].isEnabled = !shouldDisable
+                    }
+                } else {
+                    self?.lastError = "Could not \(shouldDisable ? "disable" : "enable") \(displayName). launchctl did not complete successfully."
                 }
             }
         }
@@ -275,6 +291,7 @@ struct StartupManagerView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .help("Rescan startup items")
+                .disabled(manager.isScanning)
             }
             .padding()
 
@@ -305,7 +322,10 @@ struct StartupManagerView: View {
                     LazyVStack(spacing: 1) {
                         ForEach(Array(filteredItems.enumerated()), id: \.element.id) { _, item in
                             if let index = manager.items.firstIndex(where: { $0.id == item.id }) {
-                                StartupItemRow(item: item) {
+                                StartupItemRow(
+                                    item: item,
+                                    isBusy: manager.togglingItemIDs.contains(item.id)
+                                ) {
                                     manager.toggleItem(at: index)
                                 }
                             }
@@ -320,6 +340,14 @@ struct StartupManagerView: View {
                 manager.scan()
             }
         }
+        .alert("Startup Item", isPresented: Binding(
+            get: { manager.lastError != nil },
+            set: { if !$0 { manager.lastError = nil } }
+        )) {
+            Button("OK", role: .cancel) { manager.lastError = nil }
+        } message: {
+            Text(manager.lastError ?? "")
+        }
     }
 }
 
@@ -327,6 +355,7 @@ struct StartupManagerView: View {
 
 struct StartupItemRow: View {
     let item: StartupItem
+    let isBusy: Bool
     let onToggle: () -> Void
 
     var body: some View {
@@ -382,8 +411,12 @@ struct StartupItemRow: View {
                 ))
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .disabled(isBusy)
+                .overlay {
+                    if isBusy { ProgressView().controlSize(.small) }
+                }
             } else {
-                Text(item.isEnabled ? "Active" : "Disabled")
+                Text("Installed · read-only")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

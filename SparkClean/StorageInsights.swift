@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import os
 
 struct InsightItem: Identifiable {
     let id: String          // stable key, used for history
@@ -20,6 +21,7 @@ struct InsightItem: Identifiable {
     var size: Int64 = 0
     var previousSize: Int64?    // most recent earlier measurement, for trend
     var accessible: Bool = true // false when a path exists but is unreadable (needs FDA)
+    var measurementIncomplete = false
 
     var delta: Int64? {
         guard let prev = previousSize else { return nil }
@@ -54,9 +56,12 @@ final class InsightHistoryStore: @unchecked Sendable {
     }
 
     private func save(_ samples: [InsightSample]) {
-        try? fm.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let directory = fileURL.deletingLastPathComponent()
+        try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         if let data = try? JSONEncoder().encode(samples) {
             try? data.write(to: fileURL, options: .atomic)
+            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         }
     }
 
@@ -92,6 +97,11 @@ final class StorageInsightsManager {
 
     private let history: InsightHistoryStore
     private static let home = NSHomeDirectory()
+    private let cancelLock = OSAllocatedUnfairLock(initialState: false)
+
+    private var cancelRequested: Bool {
+        cancelLock.withLock { $0 }
+    }
 
     init(history: InsightHistoryStore = InsightHistoryStore()) {
         self.history = history
@@ -102,13 +112,36 @@ final class StorageInsightsManager {
     static func defaultRegistry() -> [InsightItem] {
         [
             InsightItem(id: "whatsapp", name: "WhatsApp", icon: "message.fill",
-                        templatePaths: ["\(home)/Library/Group Containers/group.net.whatsapp.WhatsApp.shared"]),
+                        templatePaths: [
+                            "\(home)/Library/Group Containers/group.net.whatsapp.WhatsApp.shared",
+                            "\(home)/Library/Group Containers/group.net.whatsapp.WhatsApp.private",
+                            "\(home)/Library/Group Containers/group.net.whatsapp.WhatsAppSMB.shared",
+                            "\(home)/Library/Group Containers/group.net.whatsapp.family",
+                            "\(home)/Library/Containers/net.whatsapp.WhatsApp",
+                            "\(home)/Library/Containers/net.whatsapp.WhatsApp.Intents",
+                            "\(home)/Library/Containers/net.whatsapp.WhatsApp.ServiceExtension",
+                            "\(home)/Library/Containers/net.whatsapp.WhatsApp.WAAppKitBridgeService",
+                        ]),
             InsightItem(id: "telegram", name: "Telegram", icon: "paperplane.fill",
                         templatePaths: ["\(home)/Library/Group Containers/*.ru.keepcoder.Telegram"]),
             InsightItem(id: "wechat", name: "WeChat", icon: "message",
                         templatePaths: ["\(home)/Library/Containers/com.tencent.xinWeChat"]),
             InsightItem(id: "signal", name: "Signal", icon: "lock.message",
                         templatePaths: ["\(home)/Library/Application Support/Signal"]),
+            InsightItem(id: "line", name: "LINE", icon: "message.badge",
+                        templatePaths: ["\(home)/Library/Containers/jp.naver.line.mac"]),
+            InsightItem(id: "slack", name: "Slack", icon: "number",
+                        templatePaths: ["\(home)/Library/Application Support/Slack"]),
+            InsightItem(id: "discord", name: "Discord", icon: "bubble.left.and.bubble.right",
+                        templatePaths: ["\(home)/Library/Application Support/discord"]),
+            InsightItem(id: "teams", name: "Microsoft Teams", icon: "person.3.fill",
+                        templatePaths: ["\(home)/Library/Containers/com.microsoft.teams2"]),
+            InsightItem(id: "chrome-profiles", name: "Chrome Profiles", icon: "globe",
+                        templatePaths: ["\(home)/Library/Application Support/Google/Chrome"]),
+            InsightItem(id: "claude-data", name: "Claude Desktop Data", icon: "cpu",
+                        templatePaths: ["\(home)/Library/Application Support/Claude"]),
+            InsightItem(id: "jetbrains-data", name: "JetBrains IDE Data", icon: "chevron.left.forwardslash.chevron.right",
+                        templatePaths: ["\(home)/Library/Application Support/JetBrains"]),
             InsightItem(id: "messages", name: "Messages (iMessage)", icon: "bubble.left.and.bubble.right.fill",
                         templatePaths: ["\(home)/Library/Messages"]),
             InsightItem(id: "ios-backups", name: "iOS Device Backups", icon: "iphone",
@@ -117,12 +150,27 @@ final class StorageInsightsManager {
                         templatePaths: ["\(home)/Pictures/*.photoslibrary"]),
             InsightItem(id: "mail", name: "Mail", icon: "envelope.fill",
                         templatePaths: ["\(home)/Library/Mail"]),
+            InsightItem(id: "icloud-drive", name: "iCloud Drive (local)", icon: "icloud.fill",
+                        templatePaths: ["\(home)/Library/Mobile Documents"]),
             InsightItem(id: "music", name: "Music Library", icon: "music.note.house.fill",
                         templatePaths: ["\(home)/Music/Music/Media", "\(home)/Music/iTunes"]),
             InsightItem(id: "downloads", name: "Downloads", icon: "arrow.down.circle.fill",
                         templatePaths: ["\(home)/Downloads"]),
+            InsightItem(id: "developer-projects", name: "Developer Projects", icon: "folder.badge.gearshape",
+                        templatePaths: [
+                            "\(home)/GitHub", "\(home)/Projects", "\(home)/Developer",
+                            "\(home)/Work", "\(home)/Sites", "\(home)/repos",
+                            "\(home)/code", "\(home)/src", "\(home)/dev",
+                            "\(home)/workspace",
+                        ]),
+            InsightItem(id: "installed-apps", name: "Installed Applications", icon: "square.grid.2x2.fill",
+                        templatePaths: ["/Applications", "\(home)/Applications"]),
             InsightItem(id: "docker", name: "Docker Desktop", icon: "shippingbox.fill",
                         templatePaths: ["\(home)/Library/Containers/com.docker.docker"]),
+            InsightItem(id: "xcode-simulators", name: "Xcode Simulators", icon: "iphone.gen3",
+                        templatePaths: ["\(home)/Library/Developer/CoreSimulator/Devices"]),
+            InsightItem(id: "virtual-machines", name: "Virtual Machines", icon: "desktopcomputer",
+                        templatePaths: ["\(home)/Virtual Machines.localized", "\(home)/Parallels"]),
         ]
     }
 
@@ -151,33 +199,68 @@ final class StorageInsightsManager {
         return result
     }
 
-    /// Allocated size on disk of a directory tree (honest about sparse/iCloud files).
+    /// Estimated unique allocated size of a tree. Complete APFS clones that share a
+    /// content identifier are counted once instead of once per directory entry.
     static func allocatedSize(_ path: String) -> Int64 {
+        measureAllocatedSize(path).size
+    }
+
+    /// Bounded, clone-aware allocated-size walk. Returns `complete == false` on
+    /// cancellation, deadline, or the entry watchdog so one huge/cloud-backed store
+    /// cannot wedge the entire Insights refresh.
+    static func measureAllocatedSize(
+        _ path: String,
+        timeout: Duration = .seconds(30),
+        maximumEntries: Int = 500_000,
+        isCancelled: () -> Bool = { false }
+    ) -> (size: Int64, complete: Bool) {
         let fm = FileManager.default
         var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: path, isDirectory: &isDir) else { return 0 }
+        guard fm.fileExists(atPath: path, isDirectory: &isDir) else { return (0, true) }
         if !isDir.boolValue {
             let rv = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.totalFileAllocatedSizeKey])
-            return Int64(rv?.totalFileAllocatedSize ?? 0)
+            return (Int64(rv?.totalFileAllocatedSize ?? 0), true)
         }
         guard let en = fm.enumerator(at: URL(fileURLWithPath: path),
-                                     includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey],
-                                     options: []) else { return 0 }
-        var total: Int64 = 0
+                                     includingPropertiesForKeys: [
+                                        .totalFileAllocatedSizeKey, .isRegularFileKey,
+                                        .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey,
+                                        .fileContentIdentifierKey, .mayShareFileContentKey,
+                                     ],
+                                     options: []) else { return (0, false) }
+        var accounting = CloneAwareSizeAccumulator()
+        var entries = 0
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
         while let obj = en.nextObject() {
+            entries += 1
+            if isCancelled() || entries >= maximumEntries || clock.now >= deadline {
+                return (accounting.estimatedUniqueSize, false)
+            }
             guard let url = obj as? URL else { continue }
             autoreleasepool {
-                if let rv = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
+                if let rv = try? url.resourceValues(forKeys: [
+                    .totalFileAllocatedSizeKey, .isRegularFileKey,
+                    .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey,
+                    .fileContentIdentifierKey, .mayShareFileContentKey,
+                ]),
+                   !(rv.isUbiquitousItem == true &&
+                     rv.ubiquitousItemDownloadingStatus == .notDownloaded),
                    rv.isRegularFile == true {
-                    total += Int64(rv.totalFileAllocatedSize ?? 0)
+                    accounting.add(
+                        allocatedSize: Int64(rv.totalFileAllocatedSize ?? 0),
+                        mayShareFileContent: rv.mayShareFileContent,
+                        fileContentIdentifier: rv.fileContentIdentifier
+                    )
                 }
             }
         }
-        return total
+        return (accounting.estimatedUniqueSize, true)
     }
 
     /// Measure all registry items and record today's history.
     func measure(today: String) async {
+        cancelLock.withLock { $0 = false }
         await MainActor.run { isMeasuring = true }
         let registry = items
         let store = history
@@ -185,11 +268,26 @@ final class StorageInsightsManager {
             DispatchQueue.global(qos: .utility).async {
                 var results: [InsightItem] = []
                 for var item in registry {
+                    if self.cancelRequested {
+                        item.measurementIncomplete = true
+                        results.append(item)
+                        continue
+                    }
                     let resolved = item.templatePaths.flatMap { Self.resolvePaths($0) }
                     var size: Int64 = 0
                     var accessible = true
+                    var complete = true
                     for path in resolved {
-                        let s = Self.allocatedSize(path)
+                        if self.cancelRequested {
+                            complete = false
+                            break
+                        }
+                        let measurement = Self.measureAllocatedSize(
+                            path,
+                            isCancelled: { self.cancelRequested }
+                        )
+                        let s = measurement.size
+                        complete = complete && measurement.complete
                         // A path that exists but reports 0 with no readable contents is
                         // likely permission-blocked (needs Full Disk Access).
                         if s == 0 && !((try? FileManager.default.contentsOfDirectory(atPath: path)) != nil) {
@@ -199,6 +297,7 @@ final class StorageInsightsManager {
                     }
                     item.size = size
                     item.accessible = resolved.isEmpty ? true : accessible
+                    item.measurementIncomplete = !complete
                     item.previousSize = store.previousSize(for: item.id, before: today)
                     results.append(item)
                 }
@@ -206,11 +305,20 @@ final class StorageInsightsManager {
             }
         }
         // Record history for items that measured something.
-        history.record(sizes: measured.filter { $0.size > 0 }.map { ($0.id, $0.size) }, today: today)
+        history.record(
+            sizes: measured
+                .filter { $0.size > 0 && $0.accessible && !$0.measurementIncomplete }
+                .map { ($0.id, $0.size) },
+            today: today
+        )
         await MainActor.run {
             self.items = measured.sorted { $0.size > $1.size }
             self.isMeasuring = false
         }
+    }
+
+    func cancelMeasurement() {
+        cancelLock.withLock { $0 = true }
     }
 
     static func todayString(_ date: Date) -> String {

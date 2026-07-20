@@ -22,8 +22,12 @@ struct TimeMachineView: View {
     }()
 
     // The newest snapshot is kept as a restore point and can't be selected.
+    private var newestSnapshotID: String? {
+        TimeMachineManager.newestSnapshotID(in: manager.snapshots)
+    }
+
     private var deletableSnapshots: [TMSnapshot] {
-        Array(manager.snapshots.dropFirst())
+        manager.snapshots.filter { $0.id != newestSnapshotID }
     }
 
     var body: some View {
@@ -54,7 +58,7 @@ struct TimeMachineView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("\(selected.count) local snapshot(s) will be deleted via tmutil. This frees purgeable disk space and requires administrator privileges. Your Time Machine backups on external drives are not affected.")
+            Text("\(selected.count) local snapshot(s) will be deleted via tmutil. This may make snapshot-backed space available and requires administrator privileges. Your Time Machine backups on external drives are not affected.")
         }
         .alert("Time Machine", isPresented: $showResult) {
             Button("OK") {}
@@ -76,6 +80,7 @@ struct TimeMachineView: View {
             }
             Spacer()
             Button {
+                selected.removeAll()
                 Task { await manager.refresh() }
             } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
@@ -89,7 +94,7 @@ struct TimeMachineView: View {
     private var infoBanner: some View {
         HStack(spacing: 10) {
             Image(systemName: "info.circle").foregroundStyle(.blue)
-            Text("macOS keeps hourly local snapshots and only thins them lazily. Deleting old ones reclaims “purgeable” space. The most recent snapshot is kept as a restore point.")
+            Text("macOS keeps local snapshots and thins them under disk pressure. Removing old snapshots may make space available; SparkClean does not estimate an APFS reclaim amount. The most recent snapshot is kept as a restore point.")
                 .font(.caption).foregroundStyle(.secondary)
             Spacer()
         }
@@ -99,9 +104,9 @@ struct TimeMachineView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(spacing: 6) {
-                ForEach(Array(manager.snapshots.enumerated()), id: \.element.id) { index, snap in
+                ForEach(manager.snapshots) { snap in
                     HStack(spacing: 12) {
-                        if index == 0 {
+                        if snap.id == newestSnapshotID {
                             Image(systemName: "lock.fill")
                                 .foregroundStyle(.tertiary)
                                 .frame(width: 18)
@@ -118,7 +123,7 @@ struct TimeMachineView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(snap.date.map { Self.displayFormatter.string(from: $0) } ?? snap.name)
                                 .font(.callout)
-                            if index == 0 {
+                            if snap.id == newestSnapshotID {
                                 Text("Most recent — kept for restore")
                                     .font(.caption2).foregroundStyle(.tertiary)
                             }

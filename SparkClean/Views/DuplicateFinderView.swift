@@ -23,19 +23,30 @@ struct DuplicateGroup: Identifiable {
     var isSelected: Bool = false
 
     init(fileName: String, fileSize: Int64, paths: [String], isSimilarImage: Bool = false) {
-        self.fileName = fileName
         self.fileSize = fileSize
-        self.paths = paths
         self.isSimilarImage = isSimilarImage
-        // Pre-compute wasted size at init time instead of doing filesystem I/O in a computed property
         if isSimilarImage {
-            let sizes = paths.compactMap { path -> Int64? in
-                guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-                      let size = attrs[.size] as? Int64 else { return nil }
-                return size
-            }.sorted(by: >)
-            self.wastedSize = sizes.dropFirst().reduce(0, +)
+            // Keep the largest image first (then path-sort ties) so cleaning never
+            // discards the best-quality copy because filesystem enumeration happened
+            // to return a smaller image first.
+            var measured: [(path: String, size: Int64)] = []
+            measured.reserveCapacity(paths.count)
+            for path in paths {
+                let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+                let number = attrs?[.size] as? NSNumber
+                measured.append((path: path, size: number?.int64Value ?? 0))
+            }
+            measured.sort {
+                $0.size == $1.size ? $0.path < $1.path : $0.size > $1.size
+            }
+            self.paths = measured.map { $0.path }
+            self.fileName = measured.first.map {
+                ($0.path as NSString).lastPathComponent
+            } ?? fileName
+            self.wastedSize = measured.dropFirst().reduce(0) { $0 + $1.size }
         } else {
+            self.fileName = fileName
+            self.paths = paths.sorted()
             self.wastedSize = fileSize * Int64(paths.count - 1)
         }
     }
@@ -51,6 +62,7 @@ class DuplicateFinderManager {
     var scanProgress: Double = 0
     var currentScanItem = ""
     var totalWastedSpace: Int64 = 0
+    var scanWasPartial = false
     var searchQuery = ""
     var scanStats = ""
     private let cancelLock = OSAllocatedUnfairLock(initialState: false)
@@ -76,10 +88,21 @@ class DuplicateFinderManager {
         duplicateGroups.filter { $0.isSelected }.reduce(0) { $0 + $1.wastedSize }
     }
 
+    var selectedSimilarCount: Int {
+        duplicateGroups.filter { $0.isSelected && $0.isSimilarImage }.count
+    }
+
     // MARK: - Scan Duplicates
 
     func cancelScan() {
         cancelRequested = true
+    }
+
+    private static func searchRoots(home: String) -> [String] {
+        [
+            "\(home)/Downloads", "\(home)/Desktop", "\(home)/Documents",
+            "\(home)/Movies", "\(home)/Music", "\(home)/Pictures"
+        ]
     }
 
     func scanDuplicates() {
@@ -88,6 +111,7 @@ class DuplicateFinderManager {
         duplicateGroups = []
         totalWastedSpace = 0
         scanProgress = 0
+        scanWasPartial = false
         cancelRequested = false
         currentScanItem = "Preparing scan..."
 
@@ -95,19 +119,7 @@ class DuplicateFinderManager {
             guard let self else { return }
             let fm = FileManager.default
             let home = NSHomeDirectory()
-            var dirs = [
-                "\(home)/Downloads", "\(home)/Desktop", "\(home)/Documents",
-                "\(home)/Movies", "\(home)/Music", "\(home)/Pictures"
-            ]
-
-            // Add Photos library originals (inside the .photoslibrary package)
-            let photosLibPaths = [
-                "\(home)/Pictures/Photos Library.photoslibrary/originals",
-                "\(home)/Pictures/Photo Library.photoslibrary/originals"
-            ]
-            for p in photosLibPaths where fm.fileExists(atPath: p) {
-                dirs.append(p)
-            }
+            let dirs = Self.searchRoots(home: home)
 
             // Phase 1: Group files by size
             DispatchQueue.main.async {
@@ -115,63 +127,76 @@ class DuplicateFinderManager {
                 self.scanProgress = 0.05
             }
 
-            var sizeGroups: [Int64: [(String, UInt64)]] = [:] // size -> [(path, inode)]
+            // Device + inode is the real hard-link identity. Inode alone can collide
+            // across volumes and incorrectly discard an otherwise valid candidate.
+            var sizeGroups: [Int64: [(String, FileRemover.FileIdentity?)]] = [:]
             let minSize: Int64 = 100_000           // 100KB (catches photos)
             let maxSize: Int64 = 2_147_483_648     // 2GB
             var totalFilesScanned = 0
             var totalImagesScanned = 0
+            var hitWatchdog = false
+            let maximumScannedFiles = 1_000_000
 
             for (dirIndex, dir) in dirs.enumerated() where fm.fileExists(atPath: dir) {
-                if self.cancelRequested { break }
+                if self.cancelRequested || hitWatchdog { break }
                 let dirName = (dir as NSString).lastPathComponent
-                let displayName = dir.contains(".photoslibrary") ? "Photos Library" : dirName
                 DispatchQueue.main.async {
-                    self.currentScanItem = "Scanning \(displayName)..."
+                    self.currentScanItem = "Scanning \(dirName)..."
                     self.scanProgress = 0.05 + Double(dirIndex) / Double(dirs.count) * 0.30
                 }
 
-                // Photos library dirs should not skip package descendants (they're already inside)
-                let isPhotosLib = dir.contains(".photoslibrary")
                 guard let enumerator = fm.enumerator(
                     at: URL(fileURLWithPath: dir),
-                    includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey, .isPackageKey,
+                    includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .isPackageKey,
+                                                  .isSymbolicLinkKey,
+                                                  .isUbiquitousItemKey,
                                                   .ubiquitousItemDownloadingStatusKey],
-                    options: isPhotosLib ? [.skipsHiddenFiles] : [.skipsHiddenFiles, .skipsPackageDescendants]
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
                 ) else { continue }
 
                 for case let url as URL in enumerator {
+                    if self.cancelRequested || hitWatchdog {
+                        enumerator.skipDescendants()
+                        break
+                    }
                     autoreleasepool {
                         guard let rv = try? url.resourceValues(
-                            forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey, .isPackageKey,
+                            forKeys: [.fileSizeKey, .isRegularFileKey, .isPackageKey,
+                                      .isSymbolicLinkKey,
+                                      .isUbiquitousItemKey,
                                       .ubiquitousItemDownloadingStatusKey]
                         ) else { return }
 
-                        if !isPhotosLib && rv.isPackage == true { enumerator.skipDescendants(); return }
-                        if rv.ubiquitousItemDownloadingStatus == .notDownloaded { return }
+                        if rv.isPackage == true { enumerator.skipDescendants(); return }
+                        if rv.isSymbolicLink == true { return }
+                        if rv.isUbiquitousItem == true { return }
                         guard rv.isRegularFile == true else { return }
 
-                        let size = Int64(rv.totalFileAllocatedSize ?? 0)
+                        // Exact-duplicate candidates must be grouped by logical byte
+                        // length. Allocated size can differ for identical compressed,
+                        // sparse, or cloned files and would create false negatives.
+                        let size = Int64(rv.fileSize ?? 0)
                         totalFilesScanned += 1
+                        if totalFilesScanned >= maximumScannedFiles {
+                            hitWatchdog = true
+                            enumerator.skipDescendants()
+                            return
+                        }
                         let ext = url.pathExtension.lowercased()
                         if Self.imageExtensions.contains(ext) { totalImagesScanned += 1 }
                         guard size >= minSize, size <= maxSize else { return }
 
-                        // Get inode for hardlink detection
-                        var inode: UInt64 = 0
-                        if let attrs = try? fm.attributesOfItem(atPath: url.path),
-                           let ino = attrs[.systemFileNumber] as? UInt64 {
-                            inode = ino
-                        }
-
-                        sizeGroups[size, default: []].append((url.path, inode))
+                        sizeGroups[size, default: []].append((
+                            url.path,
+                            FileRemover.fileIdentity(at: url.path)
+                        ))
                     }
                 }
 
-                // Prune unique sizes after each directory to limit peak memory
-                sizeGroups = sizeGroups.filter { $0.value.count > 1 }
             }
 
-            // Final prune
+            // Keep unique sizes until every root has been visited: copies frequently
+            // live in different folders (for example Downloads and Documents).
             sizeGroups = sizeGroups.filter { $0.value.count > 1 }
 
             DispatchQueue.main.async {
@@ -197,18 +222,26 @@ class DuplicateFinderManager {
                     }
                 }
 
-                // Skip hardlinks (same inode)
-                var uniqueInodes: [UInt64: [String]] = [:]
-                for (path, inode) in entries {
-                    uniqueInodes[inode, default: []].append(path)
+                // Skip hard links (same device + inode). Identity lookup failures stay
+                // eligible rather than being conflated into one synthetic identity.
+                var uniqueIdentities: [FileRemover.FileIdentity: [String]] = [:]
+                var unknownIdentityPaths: [String] = []
+                for (path, identity) in entries {
+                    if let identity {
+                        uniqueIdentities[identity, default: []].append(path)
+                    } else {
+                        unknownIdentityPaths.append(path)
+                    }
                 }
-                let candidates = uniqueInodes.flatMap { $0.value.count == 1 ? $0.value : [] }
-                    + uniqueInodes.filter { $0.value.count > 1 }.map { $0.value.first! }
+                let candidates = uniqueIdentities.values.compactMap {
+                    $0.min()
+                } + unknownIdentityPaths
                 guard candidates.count > 1 else { continue }
 
                 // Compare first 4KB header
                 var headerGroups: [Data: [String]] = [:]
-                for path in candidates {
+                for path in candidates.sorted() {
+                    if self.cancelRequested { break }
                     autoreleasepool {
                         guard let handle = FileHandle(forReadingAtPath: path) else { return }
                         let header = handle.readData(ofLength: 4096)
@@ -221,7 +254,11 @@ class DuplicateFinderManager {
                     // Full SHA256 hash
                     var fullHashGroups: [String: [String]] = [:]
                     for path in paths {
-                        if let hash = Self.sha256(ofFile: path) {
+                        if self.cancelRequested { break }
+                        if let hash = Self.sha256(
+                            ofFile: path,
+                            isCancelled: { self.cancelRequested }
+                        ) {
                             fullHashGroups[hash, default: []].append(path)
                         }
                     }
@@ -243,28 +280,38 @@ class DuplicateFinderManager {
             let exactDupPaths = Set(results.flatMap(\.paths))
 
             // Phase 3: Find visually similar images
-            if !self.cancelRequested {
-            DispatchQueue.main.async {
-                self.currentScanItem = "Scanning for similar images..."
-                self.scanProgress = 0.70
-            }
-            let similarImages = self.scanSimilarImages(existingDupPaths: exactDupPaths)
-            results.append(contentsOf: similarImages)
-            for group in similarImages {
-                totalWasted += group.wastedSize
-            }
+            if !self.cancelRequested && !hitWatchdog {
+                DispatchQueue.main.async {
+                    self.currentScanItem = "Scanning for similar images..."
+                    self.scanProgress = 0.70
+                }
+                let similarImages = self.scanSimilarImages(existingDupPaths: exactDupPaths)
+                results.append(contentsOf: similarImages)
+                for group in similarImages {
+                    totalWasted += group.wastedSize
+                }
             }
 
             // Sort by wasted size descending
-            results.sort { $0.wastedSize > $1.wastedSize }
+            results.sort {
+                $0.wastedSize == $1.wastedSize
+                    ? ($0.paths.first ?? "") < ($1.paths.first ?? "")
+                    : $0.wastedSize > $1.wastedSize
+            }
 
+            let wasCancelled = self.cancelRequested
+            let wasPartial = wasCancelled || hitWatchdog
             DispatchQueue.main.async {
                 self.duplicateGroups = results
                 self.totalWastedSpace = totalWasted
-                self.scanStats = "Scanned \(totalFilesScanned) files (\(totalImagesScanned) images)"
+                self.scanStats = "Scanned \(totalFilesScanned) files (\(totalImagesScanned) images)" +
+                    (wasCancelled
+                        ? " · cancelled, partial results"
+                        : (hitWatchdog ? " · safety limit reached, partial results" : ""))
+                self.scanWasPartial = wasPartial
                 self.isScanning = false
                 self.scanComplete = true
-                self.scanProgress = 1.0
+                self.scanProgress = wasPartial ? 0 : 1.0
                 self.currentScanItem = ""
             }
         }
@@ -272,57 +319,124 @@ class DuplicateFinderManager {
 
     // MARK: - Clean Selected
 
-    func cleanSelected() {
+    func cleanSelected() async -> Int {
         let selected = duplicateGroups.filter { $0.isSelected }
-        guard !selected.isEmpty else { return }
+        guard !selected.isEmpty else { return 0 }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let fm = FileManager.default
-            var cleanedGroupIDs: Set<UUID> = []
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self else {
+                    continuation.resume(returning: 0)
+                    return
+                }
+                let fm = FileManager.default
+                var removedPathsByGroup: [UUID: Set<String>] = [:]
+                var failureCount = 0
+                let allowedRoots = Self.searchRoots(home: NSHomeDirectory())
 
-            // Route through the shared deletion service so duplicate removal gets the
-            // same safety rules and an undo record. Territory is permissive (the user
-            // explicitly chose these files), but the global DeletionPolicy still applies.
-            let remover = FileRemover(policy: CleanupManager.deletionPolicy, useTrash: true)
-            var manifest = CleanupManifest(
-                sessionID: ProcessInfo.processInfo.globallyUniqueString,
-                appVersion: CleanupManager.appVersionString,
-                trashMode: true
-            )
+                let remover = FileRemover(policy: CleanupManager.deletionPolicy, useTrash: true)
+                let recorder = CleanupSessionRecorder(
+                    appVersion: CleanupManager.appVersionString,
+                    trashMode: true,
+                    store: CleanupManager.manifestStore
+                )
 
-            for group in selected {
-                // Verify the "original" (kept) file still exists before deleting copies
-                guard fm.fileExists(atPath: group.paths[0]) else { continue }
+                for group in selected {
+                    // Verify the keeper still exists before deleting any copy.
+                    guard group.paths.count > 1 else {
+                        failureCount += 1
+                        continue
+                    }
+                    let keeper = group.paths[0]
+                    guard fm.fileExists(atPath: keeper),
+                          let keeperIdentity = FileRemover.fileIdentity(at: keeper) else {
+                        removedPathsByGroup[group.id, default: []].formUnion(
+                            group.paths.filter { !fm.fileExists(atPath: $0) }
+                        )
+                        failureCount += 1
+                        continue
+                    }
 
-                // Keep the first file, trash the rest
-                let pathsToRemove = Array(group.paths.dropFirst())
-                var allRemoved = true
-                for path in pathsToRemove {
-                    guard fm.fileExists(atPath: path) else { continue }
-                    switch remover.remove(path, allowedRoots: []) {
-                    case .removed(let removal):
-                        if let trashed = removal.trashedPath {
-                            manifest.entries.append(CleanupManifestEntry(
-                                originalPath: removal.originalPath, trashedPath: trashed,
-                                size: removal.size, category: "Duplicate Finder"))
+                    for path in group.paths.dropFirst() {
+                        guard fm.fileExists(atPath: path) else {
+                            removedPathsByGroup[group.id, default: []].insert(path)
+                            failureCount += 1
+                            continue
                         }
-                    default:
-                        allRemoved = false
+                        guard let identity = FileRemover.fileIdentity(at: path) else {
+                            failureCount += 1
+                            continue
+                        }
+                        let stillMatches: Bool
+                        if group.isSimilarImage,
+                           let candidateHash = Self.perceptualHash(ofImage: path),
+                           FileRemover.fileIdentity(at: keeper) == keeperIdentity,
+                           let currentKeeperHash = Self.perceptualHash(ofImage: keeper),
+                           FileRemover.fileIdentity(at: keeper) == keeperIdentity {
+                            stillMatches = Self.hammingDistance(
+                                currentKeeperHash,
+                                candidateHash
+                            ) <= 5
+                        } else if !group.isSimilarImage,
+                                  let candidateHash = Self.sha256(ofFile: path),
+                                  FileRemover.fileIdentity(at: keeper) == keeperIdentity,
+                                  let currentKeeperHash = Self.sha256(ofFile: keeper),
+                                  FileRemover.fileIdentity(at: keeper) == keeperIdentity {
+                            stillMatches = candidateHash == currentKeeperHash
+                        } else {
+                            stillMatches = false
+                        }
+                        guard stillMatches else {
+                            failureCount += 1
+                            continue
+                        }
+                        switch remover.remove(
+                            path,
+                            allowedRoots: allowedRoots,
+                            expectedIsDirectory: false,
+                            expectedIdentity: identity
+                        ) {
+                        case .removed(let removal):
+                            removedPathsByGroup[group.id, default: []].insert(removal.originalPath)
+                            recorder.record(removal, category: "Duplicate Finder")
+                            DeletionAuditLogger.shared.record(
+                                [removal],
+                                category: "Duplicate Finder",
+                                sessionID: recorder.sessionID,
+                                appVersion: CleanupManager.appVersionString,
+                                trashMode: true
+                            )
+                        default:
+                            failureCount += 1
+                        }
                     }
                 }
-                if allRemoved {
-                    cleanedGroupIDs.insert(group.id)
+
+                recorder.finish()
+
+                DispatchQueue.main.async {
+                    for index in self.duplicateGroups.indices.reversed() {
+                        let group = self.duplicateGroups[index]
+                        guard let removed = removedPathsByGroup[group.id], !removed.isEmpty else {
+                            continue
+                        }
+                        let remaining = group.paths.filter { !removed.contains($0) }
+                        if remaining.count < 2 {
+                            self.duplicateGroups.remove(at: index)
+                        } else {
+                            // Keep a truthful, deselected remainder after partial
+                            // failure so the UI never offers already-trashed paths.
+                            self.duplicateGroups[index] = DuplicateGroup(
+                                fileName: (remaining[0] as NSString).lastPathComponent,
+                                fileSize: group.fileSize,
+                                paths: remaining,
+                                isSimilarImage: group.isSimilarImage
+                            )
+                        }
+                    }
+                    self.totalWastedSpace = self.duplicateGroups.reduce(0) { $0 + $1.wastedSize }
+                    continuation.resume(returning: failureCount)
                 }
-            }
-
-            if !manifest.entries.isEmpty {
-                CleanupManager.manifestStore.save(manifest)
-                CleanupManager.manifestStore.prune()
-            }
-
-            DispatchQueue.main.async {
-                self?.duplicateGroups.removeAll { cleanedGroupIDs.contains($0.id) }
-                self?.totalWastedSpace = self?.duplicateGroups.reduce(0) { $0 + $1.wastedSize } ?? 0
             }
         }
     }
@@ -331,7 +445,9 @@ class DuplicateFinderManager {
 
     func selectAll() {
         for i in duplicateGroups.indices {
-            duplicateGroups[i].isSelected = true
+            // Similar images are intentionally never batch-selected: they are visual
+            // matches, not byte-identical files, and require individual review.
+            duplicateGroups[i].isSelected = !duplicateGroups[i].isSimilarImage
         }
     }
 
@@ -343,18 +459,23 @@ class DuplicateFinderManager {
 
     // MARK: - SHA256 Streaming Hash
 
-    private static func sha256(ofFile path: String) -> String? {
+    private static func sha256(
+        ofFile path: String,
+        isCancelled: () -> Bool = { false }
+    ) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { handle.closeFile() }
 
         var hasher = CryptoKit.SHA256()
         while autoreleasepool(invoking: {
+            if isCancelled() { return false }
             let data = handle.readData(ofLength: 262_144) // 256KB — optimal for APFS
             if data.isEmpty { return false }
             hasher.update(data: data)
             return true
         }) {}
 
+        if isCancelled() { return nil }
         let digest = hasher.finalize()
         return digest.map { String(format: "%02x", $0) }.joined()
     }
@@ -419,18 +540,8 @@ class DuplicateFinderManager {
     private func scanSimilarImages(existingDupPaths: Set<String>) -> [DuplicateGroup] {
         let fm = FileManager.default
         let home = NSHomeDirectory()
-        var dirs = [
-            "\(home)/Downloads", "\(home)/Desktop", "\(home)/Documents",
-            "\(home)/Pictures"
-        ]
-
-        // Add Photos library originals
-        let photosLibPaths = [
-            "\(home)/Pictures/Photos Library.photoslibrary/originals",
-            "\(home)/Pictures/Photo Library.photoslibrary/originals"
-        ]
-        for p in photosLibPaths where fm.fileExists(atPath: p) {
-            dirs.append(p)
+        let dirs = Self.searchRoots(home: home).filter {
+            !$0.hasSuffix("/Movies") && !$0.hasSuffix("/Music")
         }
 
         let minImageSize: Int64 = 50_000 // 50KB — images can be small
@@ -439,14 +550,22 @@ class DuplicateFinderManager {
         var imageFiles: [(path: String, size: Int64)] = []
 
         for dir in dirs where fm.fileExists(atPath: dir) {
-            let isPhotosLib = dir.contains(".photoslibrary")
+            if cancelRequested { break }
             guard let enumerator = fm.enumerator(
                 at: URL(fileURLWithPath: dir),
-                includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey, .isPackageKey],
-                options: isPhotosLib ? [.skipsHiddenFiles] : [.skipsHiddenFiles, .skipsPackageDescendants]
+                includingPropertiesForKeys: [
+                    .fileSizeKey, .isRegularFileKey, .isPackageKey,
+                    .isSymbolicLinkKey,
+                    .isUbiquitousItemKey,
+                ],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
             ) else { continue }
 
             for case let url as URL in enumerator {
+                if cancelRequested {
+                    enumerator.skipDescendants()
+                    break
+                }
                 autoreleasepool {
                     let ext = url.pathExtension.lowercased()
                     guard Self.imageExtensions.contains(ext) else { return }
@@ -454,11 +573,17 @@ class DuplicateFinderManager {
                     guard !existingDupPaths.contains(url.path) else { return }
 
                     guard let rv = try? url.resourceValues(
-                        forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey, .isPackageKey]
+                        forKeys: [
+                            .fileSizeKey, .isRegularFileKey, .isPackageKey,
+                            .isSymbolicLinkKey,
+                            .isUbiquitousItemKey,
+                        ]
                     ) else { return }
-                    if !isPhotosLib && rv.isPackage == true { enumerator.skipDescendants(); return }
+                    if rv.isPackage == true { enumerator.skipDescendants(); return }
+                    if rv.isSymbolicLink == true { return }
+                    if rv.isUbiquitousItem == true { return }
                     guard rv.isRegularFile == true else { return }
-                    let size = Int64(rv.totalFileAllocatedSize ?? 0)
+                    let size = Int64(rv.fileSize ?? 0)
                     guard size >= minImageSize else { return }
 
                     imageFiles.append((url.path, size))
@@ -471,6 +596,7 @@ class DuplicateFinderManager {
         // Compute perceptual hashes
         var hashGroups: [UInt64: [(path: String, size: Int64)]] = [:]
         for (idx, file) in imageFiles.enumerated() {
+            if cancelRequested { break }
             autoreleasepool {
                 if idx % 20 == 0 {
                     let progress = 0.70 + Double(idx) / Double(imageFiles.count) * 0.25
@@ -489,13 +615,16 @@ class DuplicateFinderManager {
         var results: [DuplicateGroup] = []
         var processedHashes = Set<UInt64>()
 
-        for (hash, files) in hashGroups where files.count > 1 {
+        for (hash, files) in hashGroups.sorted(by: { $0.key < $1.key }) {
+            if cancelRequested { break }
             guard !processedHashes.contains(hash) else { continue }
             processedHashes.insert(hash)
 
             // Also find nearby hashes (hamming distance <= 5)
             var allSimilar = files
-            for (otherHash, otherFiles) in hashGroups where otherHash != hash {
+            for (otherHash, otherFiles) in hashGroups.sorted(by: { $0.key < $1.key })
+            where otherHash != hash {
+                if cancelRequested { break }
                 if !processedHashes.contains(otherHash) && Self.hammingDistance(hash, otherHash) <= 5 {
                     allSimilar.append(contentsOf: otherFiles)
                     processedHashes.insert(otherHash)
@@ -527,6 +656,7 @@ struct DuplicateFinderView: View {
     @State private var expandedGroupIDs: Set<UUID> = []
     @State private var showCleanAlert = false
     @State private var isCleaning = false
+    @State private var cleanFailureMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -554,12 +684,30 @@ struct DuplicateFinderView: View {
         .alert("Clean Duplicates?", isPresented: $showCleanAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Move to Trash", role: .destructive) {
-                isCleaning = true
-                manager.cleanSelected()
-                isCleaning = false
+                Task {
+                    isCleaning = true
+                    let failures = await manager.cleanSelected()
+                    isCleaning = false
+                    if failures > 0 {
+                        cleanFailureMessage = "\(failures) duplicate item(s) could not be moved to Trash. The affected groups remain in the list."
+                    }
+                }
             }
         } message: {
-            Text("This will keep the first copy of each selected group and move \(manager.selectedCount) duplicate group(s) (\(CleanupManager.formatBytes(manager.selectedWastedSpace))) to Trash.")
+            Text(
+                "This keeps the first copy of each selected group and moves the others (\(CleanupManager.formatBytes(manager.selectedWastedSpace))) to Trash." +
+                (manager.selectedSimilarCount > 0
+                    ? "\n\n\(manager.selectedSimilarCount) selected group(s) are visual matches, not byte-identical files. Review every path before continuing."
+                    : "")
+            )
+        }
+        .alert("Some Duplicates Were Not Removed", isPresented: Binding(
+            get: { cleanFailureMessage != nil },
+            set: { if !$0 { cleanFailureMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { cleanFailureMessage = nil }
+        } message: {
+            Text(cleanFailureMessage ?? "")
         }
     }
 
@@ -591,20 +739,24 @@ struct DuplicateFinderView: View {
             }
 
             Button {
-                manager.scanDuplicates()
+                if manager.isScanning {
+                    manager.cancelScan()
+                } else {
+                    manager.scanDuplicates()
+                }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: manager.isScanning ? "xmark" : "arrow.clockwise")
                         .font(.system(size: 12, weight: .semibold))
-                    Text(manager.isScanning ? "Scanning..." : (manager.scanComplete ? "Rescan" : "Scan"))
+                    Text(manager.isScanning ? "Cancel" : (manager.scanComplete ? "Rescan" : "Scan"))
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.teal)
-            .disabled(manager.isScanning)
+            .tint(manager.isScanning ? .orange : .teal)
+            .disabled(isCleaning)
 
             if manager.scanComplete {
                 Menu {
@@ -677,12 +829,18 @@ struct DuplicateFinderView: View {
             Spacer()
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 48))
-                .foregroundStyle(.green)
-            Text(manager.searchQuery.isEmpty ? "No Duplicates Found" : "No Matches")
+                .foregroundStyle(manager.scanWasPartial ? .orange : .green)
+            Text(
+                manager.searchQuery.isEmpty
+                    ? (manager.scanWasPartial ? "Partial Scan Completed" : "No Duplicates Found")
+                    : "No Matches"
+            )
                 .font(.title3)
                 .fontWeight(.semibold)
             Text(manager.searchQuery.isEmpty
-                 ? "Your files look clean — no duplicate files were detected.\n\(manager.scanStats)"
+                 ? (manager.scanWasPartial
+                    ? "No duplicates were found in the files processed. Rescan to complete the remaining folders.\n\(manager.scanStats)"
+                    : "Your files look clean — no duplicate files were detected.\n\(manager.scanStats)")
                  : "No duplicate groups match your search.")
                 .font(.body)
                 .foregroundStyle(.secondary)

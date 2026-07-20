@@ -11,6 +11,22 @@ import UniformTypeIdentifiers
 
 // MARK: - Uninstaller Manager
 
+struct UninstallOutcome {
+    var appRemoved = false
+    var failedRelatedItems = 0
+    var appFailureReason: String?
+
+    init(
+        appRemoved: Bool = false,
+        failedRelatedItems: Int = 0,
+        appFailureReason: String? = nil
+    ) {
+        self.appRemoved = appRemoved
+        self.failedRelatedItems = failedRelatedItems
+        self.appFailureReason = appFailureReason
+    }
+}
+
 @Observable
 class UninstallerManager {
     var apps: [AppInfo] = [] { didSet { updateFilteredApps() } }
@@ -83,6 +99,15 @@ class UninstallerManager {
                     ) else { continue }
 
                     for url in contents where url.pathExtension == "app" {
+                        let appPolicy = DeletionPolicy(
+                            allowsApplicationBundles: true
+                        )
+                        guard appPolicy.isStableAllowedRoot(url.path),
+                              appPolicy.validate(
+                                  url.path,
+                                  allowedRoots: [url.path]
+                              )
+                        else { continue }
                         let bundle = Bundle(url: url)
                         let bundleID = bundle?.bundleIdentifier ?? ""
 
@@ -147,6 +172,7 @@ class UninstallerManager {
                 var info = app
 
                 // App bundle size
+                info.fileIdentity = FileRemover.fileIdentity(at: app.path)
                 info.appSize = Self.dirSizeAndCount(app.path).size
 
                 // Find all related paths
@@ -186,7 +212,11 @@ class UninstallerManager {
                     // Group Containers
                     let groupDir = "\(home)/Library/Group Containers"
                     if let groups = try? fm.contentsOfDirectory(atPath: groupDir) {
-                        for group in groups where group.contains(bundleID) {
+                        for group in groups
+                        where Self.identifierBoundaryMatch(
+                            containerName: group,
+                            bundleID: bundleID
+                        ) {
                             let groupPath = (groupDir as NSString).appendingPathComponent(group)
                             let (sz, cnt) = Self.dirSizeAndCount(groupPath)
                             if sz > 0 { related.append(RelatedPath(path: groupPath, category: "Group Container", size: sz, fileCount: cnt)) }
@@ -210,17 +240,21 @@ class UninstallerManager {
                     // Crash Reports
                     let crashDir = "\(home)/Library/Logs/DiagnosticReports"
                     if let crashes = try? fm.contentsOfDirectory(atPath: crashDir) {
-                        var crashSize: Int64 = 0
-                        var crashCount = 0
-                        for file in crashes where file.contains(appName) || file.contains(bundleID) {
+                        for file in crashes
+                        where Self.crashReportMatches(
+                            fileName: file,
+                            appName: appName,
+                            bundleID: bundleID
+                        ) {
                             let fullPath = (crashDir as NSString).appendingPathComponent(file)
                             if let attrs = try? fm.attributesOfItem(atPath: fullPath), let sz = attrs[.size] as? Int64 {
-                                crashSize += sz
-                                crashCount += 1
+                                related.append(RelatedPath(
+                                    path: fullPath,
+                                    category: "Crash Report",
+                                    size: sz,
+                                    fileCount: 1
+                                ))
                             }
-                        }
-                        if crashSize > 0 {
-                            related.append(RelatedPath(path: crashDir, category: "Crash Reports", size: crashSize, fileCount: crashCount))
                         }
                     }
 
@@ -239,22 +273,6 @@ class UninstallerManager {
                     }
                 }
 
-                // Launch Agents (background processes)
-                let launchAgentDirs = ["\(home)/Library/LaunchAgents", "/Library/LaunchAgents"]
-                for dir in launchAgentDirs {
-                    if let entries = try? fm.contentsOfDirectory(atPath: dir) {
-                        for entry in entries where entry.hasSuffix(".plist") {
-                            let matches = (!bundleID.isEmpty && entry.contains(bundleID)) ||
-                                          entry.lowercased().contains(appName.lowercased())
-                            if matches {
-                                let agentPath = (dir as NSString).appendingPathComponent(entry)
-                                let sz = (try? fm.attributesOfItem(atPath: agentPath))?[.size] as? Int64 ?? 0
-                                related.append(RelatedPath(path: agentPath, category: "Launch Agent", size: sz, fileCount: 1))
-                            }
-                        }
-                    }
-                }
-
                 // Application Support by app name (some apps use name instead of bundle ID)
                 if !appName.isEmpty {
                     let supportByName = "\(home)/Library/Application Support/\(appName)"
@@ -269,7 +287,15 @@ class UninstallerManager {
                     let cacheAlreadyFound = related.contains { $0.path == cacheByName }
                     if !cacheAlreadyFound && fm.fileExists(atPath: cacheByName) {
                         let (sz, cnt) = Self.dirSizeAndCount(cacheByName)
-                        if sz > 0 { related.append(RelatedPath(path: cacheByName, category: "Caches", size: sz, fileCount: cnt)) }
+                        if sz > 0 {
+                            related.append(RelatedPath(
+                                path: cacheByName,
+                                category: "Possible App Data — Cache name match",
+                                size: sz,
+                                fileCount: cnt,
+                                isSelected: false
+                            ))
+                        }
                     }
 
                     // Logs by app name
@@ -277,7 +303,15 @@ class UninstallerManager {
                     let logsAlreadyFound = related.contains { $0.path == logsByName }
                     if !logsAlreadyFound && fm.fileExists(atPath: logsByName) {
                         let (sz, cnt) = Self.dirSizeAndCount(logsByName)
-                        if sz > 0 { related.append(RelatedPath(path: logsByName, category: "Logs", size: sz, fileCount: cnt)) }
+                        if sz > 0 {
+                            related.append(RelatedPath(
+                                path: logsByName,
+                                category: "Possible App Data — Log name match",
+                                size: sz,
+                                fileCount: cnt,
+                                isSelected: false
+                            ))
+                        }
                     }
                 }
 
@@ -297,36 +331,27 @@ class UninstallerManager {
                     }
                 }
 
-                // Dotfile auto-discovery for apps not in known map
-                if KnownAppData.paths[bundleID] == nil {
-                    let homeURL = URL(fileURLWithPath: home)
-                    let appNameLower = appName.lowercased().replacingOccurrences(of: " ", with: "")
-                    let bundleSuffix = bundleID.components(separatedBy: ".").last?.lowercased() ?? ""
-
-                    if let homeContents = try? fm.contentsOfDirectory(at: homeURL, includingPropertiesForKeys: [.isDirectoryKey], options: []) {
-                        for url in homeContents {
-                            let name = url.lastPathComponent
-                            guard name.hasPrefix(".") else { continue }
-                            guard let rv = try? url.resourceValues(forKeys: [.isDirectoryKey]),
-                                  rv.isDirectory == true else { continue }
-
-                            let dirName = String(name.dropFirst()).lowercased()
-                            guard dirName.contains(appNameLower) || (!bundleSuffix.isEmpty && dirName.contains(bundleSuffix)) else { continue }
-                            guard !related.contains(where: { $0.path == url.path }) else { continue }
-
-                            let (dirSize, dirCount) = Self.dirSizeAndCount(url.path)
-
-                            if dirSize > 10_000_000 {
-                                related.append(RelatedPath(path: url.path, category: "Possible App Data (Home Directory)", size: dirSize, fileCount: dirCount))
-                            }
-                        }
-                    }
+                // Set default selection: high-confidence items ON, low-confidence OFF
+                let lowConfidenceCategories: Set<String> = [
+                    "App Support", "Container", "Group Container",
+                ]
+                let highRiskTerms = [
+                    "⚠", "warning", "data", "configuration", "models", "virtual machine", "vm &",
+                    "games library", "all containers", "database", "android sdk",
+                ]
+                for i in related.indices {
+                    let label = related[i].category.lowercased()
+                    let needsReview = lowConfidenceCategories.contains(related[i].category) ||
+                        highRiskTerms.contains { label.contains($0) }
+                    related[i].isSelected = !needsReview
                 }
 
-                // Set default selection: high-confidence items ON, low-confidence OFF
-                let lowConfidenceCategories: Set<String> = ["App Support", "Container", "Group Container", "Possible App Data (Home Directory)"]
-                for i in related.indices {
-                    related[i].isSelected = !lowConfidenceCategories.contains(related[i].category)
+                // Keep review and execution consistent: do not display a known-data
+                // entry that the shared deletion policy will refuse later. This also
+                // excludes broad direct-home roots and protected system locations.
+                let reviewPolicy = DeletionPolicy(home: home)
+                related.removeAll {
+                    !reviewPolicy.validate($0.path, allowedRoots: [$0.path])
                 }
 
                 info.relatedPaths = related.sorted { $0.size > $1.size }
@@ -337,100 +362,227 @@ class UninstallerManager {
         }
     }
 
+    /// DiagnosticReports names normally start with a process or bundle identifier
+    /// followed by a timestamp separator. Boundary matching avoids dangerous
+    /// substring collisions (for example, "Arc" must not match "Archive Utility").
+    static func crashReportMatches(
+        fileName: String,
+        appName: String,
+        bundleID: String
+    ) -> Bool {
+        let stem = (fileName as NSString).deletingPathExtension.lowercased()
+        let candidates = [appName, bundleID]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+
+        return candidates.contains { candidate in
+            stem == candidate ||
+                stem.hasPrefix(candidate + "_") ||
+                stem.hasPrefix(candidate + "-")
+        }
+    }
+
+    /// Bundle IDs embedded in Group Container names must have identifier boundaries;
+    /// raw substring matching lets `com.example.app` claim
+    /// `com.example.application.shared`.
+    static func identifierBoundaryMatch(
+        containerName: String,
+        bundleID: String
+    ) -> Bool {
+        guard !bundleID.isEmpty else { return false }
+        var searchStart = containerName.startIndex
+        while let range = containerName.range(
+            of: bundleID,
+            range: searchStart..<containerName.endIndex
+        ) {
+            let beforeIsBoundary = range.lowerBound == containerName.startIndex ||
+                !isIdentifierCharacter(
+                    containerName[containerName.index(before: range.lowerBound)]
+                )
+            let afterIsBoundary = range.upperBound == containerName.endIndex ||
+                !isIdentifierCharacter(containerName[range.upperBound])
+            if beforeIsBoundary && afterIsBoundary { return true }
+            searchStart = range.upperBound
+        }
+        return false
+    }
+
+    private static func isIdentifierCharacter(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy {
+            CharacterSet.alphanumerics.contains($0)
+        }
+    }
+
     // MARK: - Uninstall
 
-    func uninstallApp(_ app: AppInfo, trashOnly: Bool = true) async -> Bool {
+    func uninstallApp(_ app: AppInfo, trashOnly: Bool = true) async -> UninstallOutcome {
         // Check if app is running
         let runningApps = NSWorkspace.shared.runningApplications
-        if let running = runningApps.first(where: { $0.bundleIdentifier == app.bundleID }) {
-            running.terminate()
-            // Give it a moment to quit
-            try? await Task.sleep(for: .seconds(1))
+        let normalizedAppPath = URL(fileURLWithPath: app.path)
+            .standardizedFileURL.path
+        if let running = runningApps.first(where: {
+            (!app.bundleID.isEmpty && $0.bundleIdentifier == app.bundleID) ||
+                $0.bundleURL?.standardizedFileURL.path == normalizedAppPath
+        }) {
+            guard running.terminate() else {
+                return UninstallOutcome(appFailureReason: "The application refused to quit.")
+            }
+            let deadline = ContinuousClock.now + .seconds(5)
+            while !running.isTerminated && ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            guard running.isTerminated else {
+                return UninstallOutcome(appFailureReason: "The application did not quit within five seconds.")
+            }
         }
 
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let fm = FileManager.default
-                var success = true
-                var needsAdminPaths: [String] = []
+                var outcome = UninstallOutcome()
+                var relatedNeedsAdmin: [FileRemover.AdminRequest] = []
+                var appNeedsAdmin: [FileRemover.AdminRequest] = []
 
                 // Route every deletion through the shared service. The uninstaller
                 // profile permits removing whole `.app` bundles (never their interior),
                 // while all other DeletionPolicy protections still apply. Removals are
                 // recorded so an uninstall can be undone from the Trash.
-                let policy = DeletionPolicy(allowsApplicationBundles: true)
-                let remover = FileRemover(policy: policy, useTrash: trashOnly)
-                var manifest = CleanupManifest(
-                    sessionID: ProcessInfo.processInfo.globallyUniqueString,
+                let relatedRemover = FileRemover(
+                    policy: DeletionPolicy(),
+                    useTrash: trashOnly
+                )
+                let appRemover = FileRemover(
+                    policy: DeletionPolicy(allowsApplicationBundles: true),
+                    useTrash: trashOnly
+                )
+                let recorder = CleanupSessionRecorder(
                     appVersion: CleanupManager.appVersionString,
-                    trashMode: trashOnly
+                    trashMode: trashOnly,
+                    store: CleanupManager.manifestStore
                 )
 
-                func remove(_ path: String) {
-                    switch remover.remove(path, allowedRoots: []) {
+                func record(_ removal: FileRemover.Removal) {
+                    recorder.record(removal, category: "Uninstall: \(app.name)")
+                    DeletionAuditLogger.shared.record(
+                        [removal],
+                        category: "Uninstall: \(app.name)",
+                        sessionID: recorder.sessionID,
+                        appVersion: CleanupManager.appVersionString,
+                        trashMode: trashOnly
+                    )
+                }
+
+                func remove(
+                    _ path: String,
+                    knownSize: Int64,
+                    with remover: FileRemover,
+                    expectedIsDirectory: Bool? = nil,
+                    expectedIdentity: FileRemover.FileIdentity? = nil,
+                    isApplication: Bool = false,
+                    needsAdmin: inout [FileRemover.AdminRequest]
+                ) {
+                    // Exact per-item territory: every path was shown in the review UI,
+                    // and the service still applies all global protections.
+                    let roots = [path]
+                    switch remover.remove(
+                        path,
+                        allowedRoots: roots,
+                        knownSize: knownSize,
+                        expectedIsDirectory: expectedIsDirectory,
+                        expectedIdentity: expectedIdentity
+                    ) {
                     case .removed(let removal):
-                        if let trashed = removal.trashedPath {
-                            manifest.entries.append(CleanupManifestEntry(
-                                originalPath: removal.originalPath, trashedPath: trashed,
-                                size: removal.size, category: "Uninstall: \(app.name)"))
-                        }
+                        record(removal)
+                        if isApplication { outcome.appRemoved = true }
                     case .needsAdmin(let p):
-                        needsAdminPaths.append(p)
-                    case .blocked, .skippedICloud:
-                        break  // safety refused this path — skip, don't fail the uninstall
-                    case .failed:
-                        success = false
-                    }
-                }
-
-                // Remove only selected related data, then the app bundle itself.
-                for related in app.relatedPaths where related.isSelected {
-                    remove(related.path)
-                }
-                remove(app.path)
-
-                // Escalate to admin privileges for paths that failed normal trashItem
-                if !needsAdminPaths.isEmpty && trashOnly {
-                    let trashDir = NSHomeDirectory() + "/.Trash"
-                    let tempScript = NSTemporaryDirectory() + "sparkclean_uninstall_\(ProcessInfo.processInfo.processIdentifier).sh"
-                    var script = "#!/bin/bash\nset -e\n"
-                    for path in needsAdminPaths {
-                        let escaped = path.replacingOccurrences(of: "'", with: "'\\''")
-                        let name = (path as NSString).lastPathComponent.replacingOccurrences(of: "'", with: "'\\''")
-                        let trashEscaped = trashDir.replacingOccurrences(of: "'", with: "'\\''")
-                        script += """
-                        dest='\(trashEscaped)/\(name)'
-                        if [ -e "$dest" ]; then
-                            i=2; while [ -e "$dest $i" ]; do i=$((i+1)); done; dest="$dest $i"
-                        fi
-                        /bin/mv '\(escaped)' "$dest"\n
-                        """
-                    }
-                    try? script.write(toFile: tempScript, atomically: true, encoding: .utf8)
-                    try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempScript)
-
-                    let escapedScript = tempScript.replacingOccurrences(of: "'", with: "'\\''")
-                    let appleScriptSource = "do shell script \"'\(escapedScript)'\" with administrator privileges"
-
-                    // NSAppleScript must run on the main thread
-                    DispatchQueue.main.sync {
-                        var error: NSDictionary?
-                        let appleScript = NSAppleScript(source: appleScriptSource)
-                        appleScript?.executeAndReturnError(&error)
-                        if error != nil {
-                            success = false
+                        needsAdmin.append(FileRemover.AdminRequest(
+                            path: p,
+                            allowedRoots: roots,
+                            knownSize: knownSize,
+                            expectedIsDirectory: expectedIsDirectory,
+                            expectedIdentity: expectedIdentity
+                        ))
+                    case .blocked(let reason):
+                        if isApplication {
+                            outcome.appFailureReason = "Blocked by the deletion policy: \(reason)."
+                        } else {
+                            outcome.failedRelatedItems += 1
+                        }
+                    case .skippedICloud:
+                        if isApplication {
+                            outcome.appFailureReason = "The application is managed by a file provider."
+                        } else {
+                            outcome.failedRelatedItems += 1
+                        }
+                    case .failed(let error):
+                        if isApplication {
+                            outcome.appFailureReason = error
+                        } else {
+                            outcome.failedRelatedItems += 1
                         }
                     }
-                    try? fm.removeItem(atPath: tempScript)
                 }
 
-                // Persist the undo manifest for this uninstall.
-                if !manifest.entries.isEmpty {
-                    CleanupManager.manifestStore.save(manifest)
-                    CleanupManager.manifestStore.prune()
+                // Remove and verify the app bundle first. If that fails, leave all
+                // selected support data untouched so an installed app is never left
+                // behind with its preferences/databases stripped.
+                remove(
+                    app.path,
+                    knownSize: app.appSize,
+                    with: appRemover,
+                    expectedIsDirectory: true,
+                    expectedIdentity: app.fileIdentity,
+                    isApplication: true,
+                    needsAdmin: &appNeedsAdmin
+                )
+
+                if trashOnly, !appNeedsAdmin.isEmpty {
+                    let admin = appRemover.moveToTrashWithAdministratorPrivileges(
+                        appNeedsAdmin,
+                        confirmationTitle: "Uninstall \(app.name) with Administrator Access"
+                    )
+                    for removal in admin.removals {
+                        record(removal)
+                    }
+                    outcome.appRemoved = admin.removals.count == appNeedsAdmin.count
+                    if !outcome.appRemoved {
+                        outcome.appFailureReason = admin.wasCancelled
+                            ? "Administrator authorization was cancelled."
+                            : (admin.failures.first ?? "Administrator removal failed.")
+                    }
                 }
 
-                continuation.resume(returning: success)
+                guard outcome.appRemoved else {
+                    recorder.finish()
+                    continuation.resume(returning: outcome)
+                    return
+                }
+
+                for related in app.relatedPaths where related.isSelected {
+                    remove(
+                        related.path,
+                        knownSize: related.size,
+                        with: relatedRemover,
+                        expectedIdentity: related.fileIdentity,
+                        needsAdmin: &relatedNeedsAdmin
+                    )
+                }
+
+                if trashOnly, !relatedNeedsAdmin.isEmpty {
+                    let admin = relatedRemover.moveToTrashWithAdministratorPrivileges(
+                        relatedNeedsAdmin,
+                        confirmationTitle: "\(app.name) Related Data Needs Administrator Access"
+                    )
+                    for removal in admin.removals {
+                        record(removal)
+                    }
+                    outcome.failedRelatedItems += max(
+                        0,
+                        relatedNeedsAdmin.count - admin.removals.count
+                    )
+                }
+
+                recorder.finish()
+                continuation.resume(returning: outcome)
             }
         }
     }
@@ -520,9 +672,22 @@ class UninstallerManager {
         let fm = FileManager.default
         var total: Int64 = 0
         var count = 0
+        guard let rootValues = try? URL(fileURLWithPath: path)
+            .resourceValues(forKeys: [
+                .isSymbolicLinkKey, .isUbiquitousItemKey, .isVolumeKey,
+            ]),
+            rootValues.isSymbolicLink != true,
+            rootValues.isUbiquitousItem != true,
+            rootValues.isVolume != true
+        else { return (0, 0) }
+
+        let keys: Set<URLResourceKey> = [
+            .totalFileAllocatedSizeKey, .fileSizeKey, .isRegularFileKey,
+            .isSymbolicLinkKey, .isUbiquitousItemKey,
+        ]
         guard let enumerator = fm.enumerator(
             at: URL(fileURLWithPath: path),
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey, .isRegularFileKey],
+            includingPropertiesForKeys: Array(keys),
             options: [],
             errorHandler: nil
         ) else { return (0, 0) }
@@ -530,11 +695,13 @@ class UninstallerManager {
         while let obj = enumerator.nextObject() {
             guard let url = obj as? URL else { continue }
             autoreleasepool {
-                guard let rv = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileSizeKey, .isRegularFileKey]) else { return }
-                if rv.isRegularFile == true {
-                    total += Int64(rv.totalFileAllocatedSize ?? rv.fileSize ?? 0)
-                    count += 1
-                }
+                guard let rv = try? url.resourceValues(forKeys: keys),
+                      rv.isRegularFile == true,
+                      rv.isSymbolicLink != true,
+                      rv.isUbiquitousItem != true
+                else { return }
+                total += Int64(rv.totalFileAllocatedSize ?? rv.fileSize ?? 0)
+                count += 1
             }
         }
         return (total, count)
@@ -551,6 +718,7 @@ struct UninstallerView: View {
     @State private var showExportSheet = false
     @State private var isUninstalling = false
     @State private var uninstallError: String? = nil
+    @State private var uninstallIssueTitle = "Uninstall Failed"
     @State private var exportReport = ""
     @State private var isGeneratingReport = false
     @State private var lastUninstalledApp: String? = nil
@@ -623,11 +791,15 @@ struct UninstallerView: View {
                 if let app = appToUninstall {
                     Task {
                         isUninstalling = true
-                        let success = await uninstaller.uninstallApp(app)
-                        if success {
+                        let outcome = await uninstaller.uninstallApp(app)
+                        if outcome.appRemoved {
                             selectedApp = nil
                             uninstaller.apps.removeAll(where: { $0.id == app.id })
                             lastUninstalledApp = app.name
+                            if outcome.failedRelatedItems > 0 {
+                                uninstallIssueTitle = "Uninstall Partially Completed"
+                                uninstallError = "\"\(app.name)\" was moved to Trash, but \(outcome.failedRelatedItems) selected leftover item(s) could not be removed."
+                            }
                             Task {
                                 try? await Task.sleep(for: .seconds(5))
                                 if lastUninstalledApp == app.name {
@@ -635,7 +807,8 @@ struct UninstallerView: View {
                                 }
                             }
                         } else {
-                            uninstallError = "Could not move \"\(app.name)\" to Trash. You may have cancelled the admin prompt, or the app is in use. Try quitting the app first and trying again."
+                            uninstallIssueTitle = "Uninstall Failed"
+                            uninstallError = "Could not move \"\(app.name)\" to Trash. \(outcome.appFailureReason ?? "The item may be in use or require different permissions.")"
                         }
                         isUninstalling = false
                     }
@@ -643,13 +816,16 @@ struct UninstallerView: View {
             }
         } message: {
             if let app = appToUninstall {
-                Text("This will move \"\(app.name)\" and all its related data (\(CleanupManager.formatBytes(app.totalSize))) to Trash.\n\nRelated files: \(app.relatedPaths.count) locations")
+                let selectedRelated = app.relatedPaths.filter(\.isSelected)
+                let selectedSize = app.appSize +
+                    selectedRelated.reduce(0 as Int64) { $0 + $1.size }
+                Text("This will move \"\(app.name)\" and \(selectedRelated.count) selected related location(s) (\(CleanupManager.formatBytes(selectedSize))) to Trash. Unselected data stays in place.")
             }
         }
         .sheet(isPresented: $showExportSheet) {
             ExportReportView(report: $exportReport, isGenerating: $isGeneratingReport)
         }
-        .alert("Uninstall Failed", isPresented: Binding(
+        .alert(uninstallIssueTitle, isPresented: Binding(
             get: { uninstallError != nil },
             set: { if !$0 { uninstallError = nil } }
         )) {
@@ -902,7 +1078,12 @@ struct UninstallerView: View {
                 HStack {
                     Spacer()
                     Button {
-                        appToUninstall = app
+                        // Related-path toggles mutate the canonical list entry. Resolve
+                        // it again here so confirmation and deletion use the user's
+                        // latest choices rather than the copied selection value.
+                        appToUninstall = uninstaller.apps.first {
+                            $0.id == app.id
+                        } ?? app
                         showUninstallAlert = true
                     } label: {
                         HStack(spacing: 8) {
@@ -965,7 +1146,7 @@ struct UninstallerView: View {
         case "Group Container": return "square.stack.3d.up"
         case "Saved State": return "rectangle.stack"
         case "Logs": return "doc.text"
-        case "Crash Reports": return "exclamationmark.triangle"
+        case "Crash Report", "Crash Reports": return "exclamationmark.triangle"
         case "WebKit Data": return "globe"
         case "HTTP Storage": return "network"
         default: return "doc"
@@ -1024,6 +1205,21 @@ struct UninstallerView: View {
             guard let provider = providers.first else { return false }
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 guard let url, url.pathExtension == "app" else { return }
+                let policy = DeletionPolicy(allowsApplicationBundles: true)
+                guard policy.isStableAllowedRoot(url.path),
+                      policy.validate(url.path, allowedRoots: [url.path]),
+                      let values = try? url.resourceValues(forKeys: [
+                          .isUbiquitousItemKey, .isVolumeKey,
+                      ]),
+                      values.isUbiquitousItem != true,
+                      values.isVolume != true
+                else {
+                    Task { @MainActor in
+                        uninstallIssueTitle = "App Cannot Be Analyzed"
+                        uninstallError = "The dropped app is in a protected, cloud-managed, mounted, or symlinked location."
+                    }
+                    return
+                }
                 Task { @MainActor in
                     let bundle = Bundle(url: url)
                     let bundleID = bundle?.bundleIdentifier ?? ""

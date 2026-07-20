@@ -20,10 +20,16 @@ final class SparkCleanUITestsLaunchTests: XCTestCase {
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
+        app.launchArguments += [
+            "-hasCompletedOnboarding", "YES",
+            "-showIntroVideo", "NO",
+        ]
         app.launch()
 
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
+        XCTAssertTrue(
+            app.windows.firstMatch.waitForExistence(timeout: 10),
+            "SparkClean did not create its main window."
+        )
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Launch Screen"
