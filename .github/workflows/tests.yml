@@ -8,12 +8,19 @@ on:
 
 jobs:
   unit-tests:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
+      # The app target sets SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor and
+      # SWIFT_APPROACHABLE_CONCURRENCY, which require Xcode 26 / Swift 6.2+.
+      # Older Xcode silently ignores those settings and compiles the module
+      # under different isolation rules than a local build.
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.1.app || sudo xcode-select -s /Applications/Xcode_16.0.app || sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app || sudo xcode-select -s /Applications/Xcode_26.5.app || sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Show toolchain
+        run: xcodebuild -version && swift --version
 
       - name: Run unit tests
         run: |
