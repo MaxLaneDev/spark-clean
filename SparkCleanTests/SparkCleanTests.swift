@@ -10,6 +10,128 @@ import Foundation
 import SwiftUI
 @testable import SparkClean
 
+// MARK: - Localization Tests
+
+struct LocalizationTests {
+
+    @Test func supportedLanguagesMatchTheShippedCatalogs() {
+        #expect(
+            AppLocalization.supportedLanguageCodes
+                == ["en", "zh-Hans", "ja", "de", "he"]
+        )
+    }
+
+    @Test func appLanguagePreferenceMapping() {
+        #expect(AppLanguage.fromPreference(nil) == .system)
+        #expect(AppLanguage.fromPreference(["en-US"]) == .english)
+        #expect(AppLanguage.fromPreference(["zh-Hans-CN"]) == .simplifiedChinese)
+        #expect(AppLanguage.fromPreference("zh_CN") == .simplifiedChinese)
+        #expect(AppLanguage.fromPreference(["ja-JP"]) == .japanese)
+        #expect(AppLanguage.fromPreference(["de-DE"]) == .german)
+        #expect(AppLanguage.fromPreference(["he-IL"]) == .hebrew)
+        #expect(AppLanguage.fromPreference("HE_il") == .hebrew)
+        #expect(AppLanguage.fromPreference(["fr"]) == .system)
+        #expect(AppLanguage.system.preferenceValue == nil)
+        #expect(AppLanguage.english.preferenceValue == ["en"])
+        #expect(AppLanguage.simplifiedChinese.preferenceValue == ["zh-Hans"])
+        #expect(AppLanguage.japanese.preferenceValue == ["ja"])
+        #expect(AppLanguage.german.preferenceValue == ["de"])
+        #expect(AppLanguage.hebrew.preferenceValue == ["he"])
+    }
+
+    @Test func hebrewUsesRightToLeftLayout() {
+        #expect(AppLocalization.layoutDirection(for: "he") == .rightToLeft)
+        #expect(AppLocalization.layoutDirection(for: "he-IL") == .rightToLeft)
+        #expect(AppLocalization.layoutDirection(for: "he_IL") == .rightToLeft)
+        #expect(AppLocalization.layoutDirection(for: "HE") == .rightToLeft)
+        #expect(AppLocalization.layoutDirection(for: "en") == .leftToRight)
+        #expect(AppLocalization.layoutDirection(for: "zh-Hans") == .leftToRight)
+        #expect(AppLocalization.layoutDirection(for: "ja") == .leftToRight)
+        #expect(AppLocalization.layoutDirection(for: "de") == .leftToRight)
+    }
+
+    @Test func technicalTextIsIsolatedFromRightToLeftContent() {
+        #expect(
+            AppLocalization.isolateTechnicalText("~/Library/SparkClean")
+                == "\u{2066}~/Library/SparkClean\u{2069}"
+        )
+    }
+
+    @Test func everyCatalogEntryHasAFormatSafeShippedTranslation() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let catalogURL = repositoryRoot
+            .appendingPathComponent("SparkClean/Localizable.xcstrings")
+        let data = try Data(contentsOf: catalogURL)
+
+        guard
+            let catalog = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let sourceLanguage = catalog["sourceLanguage"] as? String,
+            let strings = catalog["strings"] as? [String: Any]
+        else {
+            Issue.record("Localizable.xcstrings is not a valid String Catalog")
+            return
+        }
+
+        #expect(sourceLanguage == "en")
+        for languageCode in AppLocalization.supportedLanguageCodes where languageCode != "en" {
+            var missingTranslations: [String] = []
+            var placeholderMismatches: [String] = []
+
+            for (key, rawEntry) in strings {
+                guard let entry = rawEntry as? [String: Any] else {
+                    missingTranslations.append(key)
+                    continue
+                }
+                if entry["shouldTranslate"] as? Bool == false { continue }
+
+                let localizations = entry["localizations"] as? [String: Any]
+                let english = localizations?["en"] as? [String: Any]
+                let englishUnit = english?["stringUnit"] as? [String: Any]
+                let source = englishUnit?["value"] as? String ?? key
+                let localization = localizations?[languageCode] as? [String: Any]
+                let localizedUnit = localization?["stringUnit"] as? [String: Any]
+                let translation = localizedUnit?["value"] as? String
+
+                guard localizedUnit?["state"] as? String == "translated",
+                      let translation,
+                      !translation.isEmpty else {
+                    missingTranslations.append(key)
+                    continue
+                }
+
+                if formatSpecifiers(in: source) != formatSpecifiers(in: translation) {
+                    placeholderMismatches.append(key)
+                }
+            }
+
+            if !missingTranslations.isEmpty {
+                Issue.record(
+                    "Missing \(languageCode) translations: \(missingTranslations.sorted().joined(separator: ", "))"
+                )
+            }
+            if !placeholderMismatches.isEmpty {
+                Issue.record(
+                    "\(languageCode) format placeholders do not match English: \(placeholderMismatches.sorted().joined(separator: ", "))"
+                )
+            }
+        }
+    }
+
+    private func formatSpecifiers(in value: String) -> [String] {
+        let pattern = #"%(?:\d+\$)?(?:lld|ld|llu|lu|d|u|f|g|@)|%%"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+        let fullRange = NSRange(value.startIndex..., in: value)
+        return expression.matches(in: value, range: fullRange)
+            .compactMap { Range($0.range, in: value).map { String(value[$0]) } }
+            .map { $0.replacingOccurrences(of: #"^%\d+\$"#, with: "%", options: .regularExpression) }
+            .sorted()
+    }
+}
+
 // MARK: - Format Tests
 
 struct FormatTests {
@@ -46,9 +168,9 @@ struct FormatTests {
 struct SafetyLevelTests {
 
     @Test func safetyLevelLabels() {
-        #expect(SafetyLevel.safe.label == "Safe to delete")
-        #expect(SafetyLevel.review.label == "Review before deleting")
-        #expect(SafetyLevel.caution.label == "Use caution")
+        #expect(SafetyLevel.safe.label == String(localized: "Safe to delete"))
+        #expect(SafetyLevel.review.label == String(localized: "Review before deleting"))
+        #expect(SafetyLevel.caution.label == String(localized: "Use caution"))
     }
 
     @Test func safetyLevelIcons() {
@@ -259,7 +381,7 @@ struct CleanupManagerLogicTests {
         let report = manager.exportReport()
         #expect(report.contains("Test Category"))
         // The report renders group headers uppercased ("SYSTEM").
-        #expect(report.localizedCaseInsensitiveContains("System"))
+        #expect(report.localizedCaseInsensitiveContains(String(localized: "System")))
     }
 
     // MARK: Helpers

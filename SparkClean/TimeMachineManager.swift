@@ -99,7 +99,9 @@ final class TimeMachineManager {
         let parsed = Self.parseLocalSnapshots(result.0)
         await MainActor.run {
             snapshots = parsed.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-            if !result.1 && parsed.isEmpty { lastError = "Could not list Time Machine snapshots." }
+            if !result.1 && parsed.isEmpty {
+                lastError = String(localized: "Could not list Time Machine snapshots.")
+            }
             isBusy = false
         }
     }
@@ -218,11 +220,11 @@ final class TimeMachineManager {
                 if allRemoved {
                     lastError = nil
                 } else if !verification.removed.isEmpty {
-                    lastError = "Removed \(verification.removed.count) of \(stamps.count) snapshots. The remaining snapshots were not deleted."
+                    lastError = String(localized: "Removed \(verification.removed.count) of \(stamps.count) snapshots. The remaining snapshots were not deleted.")
                 } else {
                     lastError = ok
-                        ? "The selected snapshots are still present."
-                        : "Snapshot deletion failed or was cancelled."
+                        ? String(localized: "The selected snapshots are still present.")
+                        : String(localized: "Snapshot deletion failed or was cancelled.")
                 }
             }
             isBusy = false

@@ -15,6 +15,7 @@ private var _introPlayedThisSession = false
 // MARK: - Main Content View
 
 struct ContentView: View {
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var manager = CleanupManager()
     @State private var showCleanAlert = false
     @State private var selectedSidebar: SidebarItem =
@@ -36,6 +37,59 @@ struct ContentView: View {
     @AppStorage("showIntroVideo") private var showIntroVideo = true
     @State private var introPlayed = _introPlayedThisSession
 
+    private var sidebarPane: some View {
+        VStack(spacing: 0) {
+            sidebarContent
+        }
+        .frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("mainSidebar")
+    }
+
+    @ViewBuilder
+    private var detailPane: some View {
+        Group {
+            switch selectedSidebar {
+            case .dashboard:
+                DashboardView(
+                    manager: manager,
+                    showCleanAlert: $showCleanAlert,
+                    selectedSidebar: $selectedSidebar,
+                    showExportSheet: $showExportSheet,
+                    exportVerbose: $exportVerbose,
+                    introPlayed: $introPlayed,
+                    showIntroVideo: showIntroVideo,
+                    onExport: { verbose in generateAndShowReport(verbose: verbose) }
+                )
+            case .group(let group):
+                CategoryGroupDetailView(
+                    manager: manager,
+                    group: group,
+                    showCleanAlert: $showCleanAlert
+                )
+            case .uninstaller:
+                UninstallerView()
+            case .duplicateFinder:
+                DuplicateFinderView()
+            case .maintenance:
+                MaintenanceView()
+            case .startupManager:
+                StartupManagerView()
+            case .timeMachine:
+                TimeMachineView()
+            case .diskMap:
+                DiskMapView()
+            case .storageInsights:
+                StorageInsightsView {
+                    selectedSidebar = .group(.applications)
+                    guard !manager.isScanning else { return }
+                    Task { await manager.scan(onlyGroup: .applications) }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private func generateAndShowReport(verbose: Bool) {
         exportVerbose = verbose
         isGeneratingReport = true
@@ -52,54 +106,13 @@ struct ContentView: View {
 
     var body: some View {
         HSplitView {
-            // Sidebar
-            VStack(spacing: 0) {
-                sidebarContent
+            if layoutDirection == .rightToLeft {
+                detailPane
+                sidebarPane
+            } else {
+                sidebarPane
+                detailPane
             }
-            .frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
-            .background(Color(nsColor: .windowBackgroundColor))
-
-            // Detail
-            Group {
-                switch selectedSidebar {
-                case .dashboard:
-                    DashboardView(
-                        manager: manager,
-                        showCleanAlert: $showCleanAlert,
-                        selectedSidebar: $selectedSidebar,
-                        showExportSheet: $showExportSheet,
-                        exportVerbose: $exportVerbose,
-                        introPlayed: $introPlayed,
-                        showIntroVideo: showIntroVideo,
-                        onExport: { verbose in generateAndShowReport(verbose: verbose) }
-                    )
-                case .group(let group):
-                    CategoryGroupDetailView(
-                        manager: manager,
-                        group: group,
-                        showCleanAlert: $showCleanAlert
-                    )
-                case .uninstaller:
-                    UninstallerView()
-                case .duplicateFinder:
-                    DuplicateFinderView()
-                case .maintenance:
-                    MaintenanceView()
-                case .startupManager:
-                    StartupManagerView()
-                case .timeMachine:
-                    TimeMachineView()
-                case .diskMap:
-                    DiskMapView()
-                case .storageInsights:
-                    StorageInsightsView {
-                        selectedSidebar = .group(.applications)
-                        guard !manager.isScanning else { return }
-                        Task { await manager.scan(onlyGroup: .applications) }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         // Clean confirmation with safety breakdown
         .sheet(isPresented: $showCleanAlert) {
@@ -118,8 +131,8 @@ struct ContentView: View {
         .alert(
             manager.lastMovedToTrashSize > 0 &&
                 manager.lastPermanentlyDeletedSize == 0
-                ? "Moved to Trash"
-                : "Cleanup Complete",
+                ? String(localized: "Moved to Trash")
+                : String(localized: "Cleanup Complete"),
             isPresented: $showCleanComplete
         ) {
             if !manager.cleanErrors.isEmpty {
@@ -129,15 +142,15 @@ struct ContentView: View {
                 Button("Restore Cleanup") {
                     Task {
                         guard let outcome = await manager.restoreLastCleanup() else { return }
-                        restoreMessage = "Restored \(outcome.restored) item(s)."
+                        restoreMessage = String(localized: "Restored \(outcome.restored) item(s).")
                         if outcome.skippedExisting > 0 {
-                            restoreMessage += " \(outcome.skippedExisting) conflict(s) remain available to retry."
+                            restoreMessage += String(localized: " \(outcome.skippedExisting) conflict(s) remain available to retry.")
                         }
                         if outcome.missingInTrash > 0 {
-                            restoreMessage += " \(outcome.missingInTrash) item(s) were no longer in Trash."
+                            restoreMessage += String(localized: " \(outcome.missingInTrash) item(s) were no longer in Trash.")
                         }
                         if outcome.failed > 0 {
-                            restoreMessage += " \(outcome.failed) item(s) failed validation or could not be restored."
+                            restoreMessage += String(localized: " \(outcome.failed) item(s) failed validation or could not be restored.")
                         }
                         showRestoreResult = true
                         manager.fetchDiskUsage()
@@ -155,22 +168,26 @@ struct ContentView: View {
         } message: {
             let errorNote = manager.cleanErrors.isEmpty
                 ? ""
-                : "\n\n\(manager.cleanErrors.count) cleanup issue(s) were reported."
+                : String(localized: "\n\n\(manager.cleanErrors.count) cleanup issue(s) were reported.")
             let trashNote = manager.lastMovedToTrashSize > 0
-                ? "\n\n\(CleanupManager.formatBytes(manager.lastMovedToTrashSize)) was moved to Trash and is still using disk space. Empty Trash to reclaim that space, or restore the cleanup before emptying it."
+                ? String(localized: "\n\n\(CleanupManager.formatBytes(manager.lastMovedToTrashSize)) was moved to Trash and is still using disk space. Empty Trash to reclaim that space, or restore the cleanup before emptying it.")
                 : ""
             let permanentNote = manager.lastPermanentlyDeletedSize > 0
-                ? "\n\n\(CleanupManager.formatBytes(manager.lastPermanentlyDeletedSize)) was permanently removed."
+                ? String(localized: "\n\n\(CleanupManager.formatBytes(manager.lastPermanentlyDeletedSize)) was permanently removed.")
                 : ""
             Text(
-                "Processed \(CleanupManager.formatBytes(manager.lastCleanedSize)) across \(manager.lastCleanedCount) categories (\(manager.cleanSuccessCount) succeeded, \(manager.cleanFailCount) had errors).\(trashNote)\(permanentNote)\(errorNote)"
+                String(localized: "Processed \(CleanupManager.formatBytes(manager.lastCleanedSize)) across \(manager.lastCleanedCount) categories (\(manager.cleanSuccessCount) succeeded, \(manager.cleanFailCount) had errors).\(trashNote)\(permanentNote)\(errorNote)")
             )
         }
         // Clean errors detail
         .alert("Clean Errors", isPresented: $showCleanErrors) {
             Button("OK") {}
         } message: {
-            Text(manager.cleanErrors.prefix(10).joined(separator: "\n") + (manager.cleanErrors.count > 10 ? "\n...and \(manager.cleanErrors.count - 10) more" : ""))
+            let remaining = manager.cleanErrors.count - 10
+            Text(
+                manager.cleanErrors.prefix(10).joined(separator: "\n")
+                    + (remaining > 0 ? String(localized: "\n...and \(remaining) more") : "")
+            )
         }
         // Restore result
         .alert("Restore Last Cleanup", isPresented: $showRestoreResult) {
@@ -223,14 +240,20 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .restoreLastCleanup)) { _ in
             Task {
                 guard let outcome = await manager.restoreLastCleanup() else {
-                    restoreMessage = "There is no recent cleanup to restore."
+                    restoreMessage = String(localized: "There is no recent cleanup to restore.")
                     showRestoreResult = true
                     return
                 }
-                var parts = ["Restored \(outcome.restored) item(s) from the Trash."]
-                if outcome.skippedExisting > 0 { parts.append("\(outcome.skippedExisting) skipped (a file already exists at the original location).") }
-                if outcome.missingInTrash > 0 { parts.append("\(outcome.missingInTrash) no longer in the Trash.") }
-                if outcome.failed > 0 { parts.append("\(outcome.failed) could not be restored.") }
+                var parts = [String(localized: "Restored \(outcome.restored) item(s) from the Trash.")]
+                if outcome.skippedExisting > 0 {
+                    parts.append(String(localized: "\(outcome.skippedExisting) skipped (a file already exists at the original location)."))
+                }
+                if outcome.missingInTrash > 0 {
+                    parts.append(String(localized: "\(outcome.missingInTrash) no longer in the Trash."))
+                }
+                if outcome.failed > 0 {
+                    parts.append(String(localized: "\(outcome.failed) could not be restored."))
+                }
                 restoreMessage = parts.joined(separator: "\n")
                 showRestoreResult = true
                 manager.fetchDiskUsage()
@@ -263,7 +286,7 @@ struct ContentView: View {
         List {
             Section {
                 SidebarRow(
-                    label: "Dashboard",
+                    label: String(localized: "Dashboard"),
                     icon: "gauge.with.dots.needle.33percent",
                     iconColor: .accentColor,
                     isSelected: selectedSidebar == .dashboard
@@ -295,7 +318,7 @@ struct ContentView: View {
 
             Section("Tools") {
                 SidebarRow(
-                    label: "Uninstaller",
+                    label: String(localized: "Uninstaller"),
                     icon: "trash.square",
                     iconColor: .red,
                     isSelected: selectedSidebar == .uninstaller
@@ -304,7 +327,7 @@ struct ContentView: View {
                 }
 
                 SidebarRow(
-                    label: "Duplicate Finder",
+                    label: String(localized: "Duplicate Finder"),
                     icon: "doc.on.doc",
                     iconColor: .teal,
                     isSelected: selectedSidebar == .duplicateFinder
@@ -313,7 +336,7 @@ struct ContentView: View {
                 }
 
                 SidebarRow(
-                    label: "Maintenance",
+                    label: String(localized: "Maintenance"),
                     icon: "wrench.and.screwdriver",
                     iconColor: .orange,
                     isSelected: selectedSidebar == .maintenance
@@ -322,7 +345,7 @@ struct ContentView: View {
                 }
 
                 SidebarRow(
-                    label: "Startup Items",
+                    label: String(localized: "Startup Items"),
                     icon: "bolt.circle",
                     iconColor: .yellow,
                     isSelected: selectedSidebar == .startupManager
@@ -331,7 +354,7 @@ struct ContentView: View {
                 }
 
                 SidebarRow(
-                    label: "Time Machine",
+                    label: String(localized: "Time Machine"),
                     icon: "clock.arrow.2.circlepath",
                     iconColor: .purple,
                     isSelected: selectedSidebar == .timeMachine
@@ -340,7 +363,7 @@ struct ContentView: View {
                 }
 
                 SidebarRow(
-                    label: "Disk Map",
+                    label: String(localized: "Disk Map"),
                     icon: "internaldrive.fill",
                     iconColor: .indigo,
                     isSelected: selectedSidebar == .diskMap
@@ -349,7 +372,7 @@ struct ContentView: View {
                 }
 
                 SidebarRow(
-                    label: "Storage Insights",
+                    label: String(localized: "Storage Insights"),
                     icon: "chart.bar.doc.horizontal",
                     iconColor: .teal,
                     isSelected: selectedSidebar == .storageInsights
@@ -534,7 +557,7 @@ struct DashboardView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "trash")
                             .font(.system(size: 12, weight: .semibold))
-                        Text(manager.isCleaning ? "Cleaning..." : "Clean")
+                        Text(manager.isCleaning ? String(localized: "Cleaning...") : String(localized: "Clean"))
                             .font(.system(size: 13, weight: .semibold))
                     }
                     .padding(.horizontal, 14)
@@ -551,7 +574,11 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: manager.isScanning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
                         .font(.system(size: 12, weight: .semibold))
-                    Text(manager.isScanning ? "Scanning..." : (manager.scanComplete ? "Rescan" : "Scan"))
+                    Text(
+                        manager.isScanning
+                            ? String(localized: "Scanning...")
+                            : (manager.scanComplete ? String(localized: "Rescan") : String(localized: "Scan"))
+                    )
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .padding(.horizontal, 14)
@@ -663,13 +690,15 @@ struct DashboardView: View {
 
     private var summaryStatsGrid: some View {
         HStack(spacing: 14) {
-            StatCard(title: "Categories", value: "\(manager.categories.count)", icon: "folder", color: .blue)
-            StatCard(title: "Selected", value: CleanupManager.formatBytes(manager.totalSize), icon: "checkmark.circle", color: .green)
-            StatCard(title: "Files", value: formatNumber(manager.categories.reduce(0) { $0 + $1.fileCount }), icon: "doc", color: .orange)
+            StatCard(title: String(localized: "Categories"), value: "\(manager.categories.count)", icon: "folder", color: .blue)
+            StatCard(title: String(localized: "Selected"), value: CleanupManager.formatBytes(manager.totalSize), icon: "checkmark.circle", color: .green)
+            StatCard(title: String(localized: "Files"), value: formatNumber(manager.categories.reduce(0) { $0 + $1.fileCount }), icon: "doc", color: .orange)
             if let summary = manager.lastScanSummary {
                 StatCard(
-                    title: summary.wasPartial ? "Partial Scan" : "Scan Time",
-                    value: String(format: "%.1fs", summary.scanDuration),
+                    title: summary.wasPartial ? String(localized: "Partial Scan") : String(localized: "Scan Time"),
+                    value: String(
+                        localized: "\(summary.scanDuration.formatted(.number.precision(.fractionLength(1)))) seconds"
+                    ),
                     icon: summary.wasPartial ? "exclamationmark.clock" : "clock",
                     color: summary.wasPartial ? .orange : .purple
                 )
@@ -808,9 +837,9 @@ struct DashboardView: View {
 
             if let disk = manager.diskUsage {
                 HStack(spacing: 20) {
-                    DiskMiniStat(label: "Total", value: CleanupManager.formatBytes(disk.totalSpace))
-                    DiskMiniStat(label: "Used", value: CleanupManager.formatBytes(disk.usedSpace))
-                    DiskMiniStat(label: "Free", value: CleanupManager.formatBytes(disk.freeSpace))
+                    DiskMiniStat(label: String(localized: "Total"), value: CleanupManager.formatBytes(disk.totalSpace))
+                    DiskMiniStat(label: String(localized: "Used"), value: CleanupManager.formatBytes(disk.usedSpace))
+                    DiskMiniStat(label: String(localized: "Free"), value: CleanupManager.formatBytes(disk.freeSpace))
                 }
                 .padding()
                 .background(
@@ -824,9 +853,7 @@ struct DashboardView: View {
     }
 
     private func formatNumber(_ n: Int) -> String {
-        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
-        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
-        return "\(n)"
+        n.formatted(.number.notation(.compactName))
     }
 }
 
@@ -952,9 +979,9 @@ struct CleanConfirmationSheet: View {
 
                     // Overview
                     HStack(spacing: 20) {
-                        summaryCard("Total Size", value: CleanupManager.formatBytes(selectedSize), color: .blue)
-                        summaryCard("Categories", value: "\(selectedCategories.count)", color: .purple)
-                        summaryCard("Items", value: "\(selectedFiles)", color: .orange)
+                        summaryCard(String(localized: "Total Size"), value: CleanupManager.formatBytes(selectedSize), color: .blue)
+                        summaryCard(String(localized: "Categories"), value: "\(selectedCategories.count)", color: .purple)
+                        summaryCard(String(localized: "Items"), value: "\(selectedFiles)", color: .orange)
                     }
                     .padding(.top, 12)
 
@@ -1104,7 +1131,11 @@ struct CleanConfirmationSheet: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: permanentItems.isEmpty ? "trash" : "exclamationmark.triangle.fill")
-                            Text("\(permanentItems.isEmpty ? "Move to Trash" : "Clean Selected") — \(CleanupManager.formatBytes(selectedSize))")
+                            Text(
+                                permanentItems.isEmpty
+                                    ? String(localized: "Move to Trash — \(CleanupManager.formatBytes(selectedSize))")
+                                    : String(localized: "Clean Selected — \(CleanupManager.formatBytes(selectedSize))")
+                            )
                         }
                     }
                     .keyboardShortcut(.defaultAction)
@@ -1134,11 +1165,15 @@ struct CleanConfirmationSheet: View {
                 .font(.callout)
 
             if permanent {
-                Text(cat.isDockerResource
-                     ? "via Docker CLI"
-                     : (cat.isOllamaResource
-                        ? "via Ollama CLI"
-                        : (cat.requiresPermanentDeletion ? "empty Trash" : "direct delete")))
+                Text(
+                    cat.isDockerResource
+                        ? String(localized: "via Docker CLI")
+                        : (cat.isOllamaResource
+                            ? String(localized: "via Ollama CLI")
+                            : (cat.requiresPermanentDeletion
+                                ? String(localized: "empty Trash")
+                                : String(localized: "direct delete")))
+                )
                     .font(.caption2)
                     .foregroundStyle(.red)
                     .padding(.horizontal, 5)
@@ -1188,7 +1223,7 @@ struct CleanConfirmationSheet: View {
             Text(level.label)
                 .font(.callout)
             Spacer()
-            Text("\(count) \(count == 1 ? "category" : "categories")")
+            Text(count == 1 ? String(localized: "1 category") : String(localized: "\(count) categories"))
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -1232,24 +1267,24 @@ struct OnboardingView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 featureRow(icon: "magnifyingglass", color: .blue,
-                    title: "Deep Scan",
-                    desc: "Finds caches, temp files, build artifacts, browser data, and more.")
+                    title: String(localized: "Deep Scan"),
+                    desc: String(localized: "Finds caches, temp files, build artifacts, browser data, and more."))
 
                 featureRow(icon: "checkmark.shield.fill", color: .green,
-                    title: "Safety Levels",
-                    desc: "Every item is labeled Safe, Review, or Caution so you know what's risk-free.")
+                    title: String(localized: "Safety Levels"),
+                    desc: String(localized: "Every item is labeled Safe, Review, or Caution so you know what's risk-free."))
 
                 featureRow(icon: "trash", color: .orange,
-                    title: "Trash First",
-                    desc: "Files are moved to Trash by default — you can always recover them.")
+                    title: String(localized: "Trash First"),
+                    desc: String(localized: "Files are moved to Trash by default — you can always recover them."))
 
                 featureRow(icon: "app.badge.checkmark", color: .purple,
-                    title: "App Uninstaller",
-                    desc: "Completely remove apps and all their hidden data with one click.")
+                    title: String(localized: "App Uninstaller"),
+                    desc: String(localized: "Completely remove apps and all their hidden data with one click."))
 
                 featureRow(icon: "doc.on.doc", color: .teal,
-                    title: "Duplicate Finder",
-                    desc: "Find and remove duplicate files wasting disk space.")
+                    title: String(localized: "Duplicate Finder"),
+                    desc: String(localized: "Find and remove duplicate files wasting disk space."))
             }
             .padding(.horizontal, 20)
 
@@ -1260,7 +1295,7 @@ struct OnboardingView: View {
             } label: {
                 HStack(spacing: 6) {
                     Text("Next: Set Up Permissions")
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -1296,27 +1331,30 @@ struct OnboardingView: View {
                 permissionCard(
                     icon: "lock.open.fill",
                     color: .orange,
-                    title: "Full Disk Access",
-                    desc: "Required to scan Mail, Messages, system caches, and all directories.",
-                    importance: "Required",
+                    title: String(localized: "Full Disk Access"),
+                    desc: String(localized: "Required to scan Mail, Messages, system caches, and all directories."),
+                    importance: String(localized: "Required"),
+                    importanceColor: .red,
                     urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
                 )
 
                 permissionCard(
                     icon: "folder.fill",
                     color: .blue,
-                    title: "Files & Folders",
-                    desc: "Access Downloads, Documents, Desktop, and removable volumes.",
-                    importance: "Recommended",
+                    title: String(localized: "Files & Folders"),
+                    desc: String(localized: "Access Downloads, Documents, Desktop, and removable volumes."),
+                    importance: String(localized: "Recommended"),
+                    importanceColor: .blue,
                     urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders"
                 )
 
                 permissionCard(
                     icon: "gearshape.fill",
                     color: .gray,
-                    title: "Automation",
-                    desc: "Allows Docker cleanup commands and Finder integration.",
-                    importance: "Optional",
+                    title: String(localized: "Automation"),
+                    desc: String(localized: "Allows Docker cleanup commands and Finder integration."),
+                    importance: String(localized: "Optional"),
+                    importanceColor: .gray,
                     urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
                 )
             }
@@ -1347,7 +1385,15 @@ struct OnboardingView: View {
         .padding(28)
     }
 
-    private func permissionCard(icon: String, color: Color, title: String, desc: String, importance: String, urlString: String) -> some View {
+    private func permissionCard(
+        icon: String,
+        color: Color,
+        title: String,
+        desc: String,
+        importance: String,
+        importanceColor: Color,
+        urlString: String
+    ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title3)
@@ -1363,9 +1409,9 @@ struct OnboardingView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
-                            Capsule().fill(importance == "Required" ? Color.red.opacity(0.15) : (importance == "Recommended" ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15)))
+                            Capsule().fill(importanceColor.opacity(0.15))
                         )
-                        .foregroundStyle(importance == "Required" ? .red : (importance == "Recommended" ? .blue : .gray))
+                        .foregroundStyle(importanceColor)
                 }
                 Text(desc)
                     .font(.caption)
@@ -1382,7 +1428,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .accessibilityLabel("Open \(title) settings")
+            .accessibilityLabel(String(localized: "Open \(title) settings"))
         }
         .padding(14)
         .background(
@@ -1392,7 +1438,12 @@ struct OnboardingView: View {
         )
     }
 
-    private func featureRow(icon: String, color: Color, title: String, desc: String) -> some View {
+    private func featureRow(
+        icon: String,
+        color: Color,
+        title: String,
+        desc: String
+    ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.title3)
@@ -1535,23 +1586,35 @@ struct HelpView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    helpSection("Getting Started",
-                        "Click **Scan** to analyze your Mac. SparkClean will find caches, reviewable stale temporary files, build artifacts, and other reclaimable space.")
+                    helpSection(
+                        String(localized: "Getting Started"),
+                        AttributedString(localized: "Click **Scan** to analyze your Mac. SparkClean will find caches, reviewable stale temporary files, build artifacts, and other reclaimable space.")
+                    )
 
-                    helpSection("Safety Levels",
-                        "**Safe** (green): Low-risk caches, logs, and generated files expected to rebuild.\n**Review** (orange): User files like old downloads or stale temp files. Check before deleting.\n**Caution** (red): App data or Docker resources. Could affect running apps.")
+                    helpSection(
+                        String(localized: "Safety Levels"),
+                        AttributedString(localized: "**Safe** (green): Low-risk caches, logs, and generated files expected to rebuild.\n**Review** (orange): User files like old downloads or stale temp files. Check before deleting.\n**Caution** (red): App data or Docker resources. Could affect running apps.")
+                    )
 
-                    helpSection("Cleaning",
-                        "Select categories you want to clean, then click **Clean**. Files are moved to Trash by default so you can recover them if needed.")
+                    helpSection(
+                        String(localized: "Cleaning"),
+                        AttributedString(localized: "Select categories you want to clean, then click **Clean**. Files are moved to Trash by default so you can recover them if needed.")
+                    )
 
-                    helpSection("App Uninstaller",
-                        "The Uninstaller finds all installed apps and their hidden data (caches, preferences, containers). Remove everything with one click.")
+                    helpSection(
+                        String(localized: "App Uninstaller"),
+                        AttributedString(localized: "The Uninstaller finds all installed apps and their hidden data (caches, preferences, containers). Remove everything with one click.")
+                    )
 
-                    helpSection("Keyboard Shortcuts",
-                        "**Cmd+R** — Scan\n**Cmd+E** — Export Report\n**Cmd+Shift+A** — Select All\n**Cmd+Shift+D** — Deselect All\n**Cmd+Shift+S** — Select Safe Only")
+                    helpSection(
+                        String(localized: "Keyboard Shortcuts"),
+                        AttributedString(localized: "**Cmd+R** — Scan\n**Cmd+E** — Export Report\n**Cmd+Shift+A** — Select All\n**Cmd+Shift+D** — Deselect All\n**Cmd+Shift+S** — Select Safe Only")
+                    )
 
-                    helpSection("Contact",
-                        "Report issues or get help at:\ngithub.com/georgekhananaev/spark-clean/issues")
+                    helpSection(
+                        String(localized: "Contact"),
+                        AttributedString(localized: "Report issues or get help at:\ngithub.com/georgekhananaev/spark-clean/issues")
+                    )
                 }
             }
         }
@@ -1559,11 +1622,11 @@ struct HelpView: View {
         .frame(width: 500, height: 480)
     }
 
-    private func helpSection(_ title: String, _ body: String) -> some View {
+    private func helpSection(_ title: String, _ body: AttributedString) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.headline)
-            Text(.init(body))
+            Text(body)
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
@@ -1592,23 +1655,35 @@ struct PrivacyPolicyView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    policySection("Data Collection",
-                        "SparkClean does not send personal data, file paths, or scan results to George Khananaev or any SparkClean service. Scanning and cleanup happen on your device.")
+                    policySection(
+                        String(localized: "Data Collection"),
+                        String(localized: "SparkClean does not send personal data, file paths, or scan results to George Khananaev or any SparkClean service. Scanning and cleanup happen on your device.")
+                    )
 
-                    policySection("Network Access",
-                        "SparkClean works offline by default. Optional update checks contact GitHub to compare versions. If you choose Download Update, the selected GitHub release is downloaded to a location you approve. No analytics, telemetry, or tracking requests are sent.")
+                    policySection(
+                        String(localized: "Network Access"),
+                        String(localized: "SparkClean works offline by default. Optional update checks contact GitHub to compare versions. If you choose Download Update, the selected GitHub release is downloaded to a location you approve. No analytics, telemetry, or tracking requests are sent.")
+                    )
 
-                    policySection("File Access",
-                        "SparkClean reads file metadata (including paths, sizes, and dates) to identify reviewable space. It only removes categories or items you select and confirm. Files move to Trash by default; the confirmation sheet identifies command-based and permanent exceptions.")
+                    policySection(
+                        String(localized: "File Access"),
+                        String(localized: "SparkClean reads file metadata (including paths, sizes, and dates) to identify reviewable space. It only removes categories or items you select and confirm. Files move to Trash by default; the confirmation sheet identifies command-based and permanent exceptions.")
+                    )
 
-                    policySection("Local Records",
-                        "Settings, Storage Insights size history, the latest scan audit, Restore Last Cleanup manifests, and deletion audit logs are stored only on this Mac. Scan, undo, and audit records can contain local file paths. They are kept under ~/Library/Application Support/SparkClean and ~/Library/Logs/SparkClean, are never uploaded, and can be removed by deleting those folders.")
+                    policySection(
+                        String(localized: "Local Records"),
+                        String(localized: "Settings, Storage Insights size history, the latest scan audit, Restore Last Cleanup manifests, and deletion audit logs are stored only on this Mac. Scan, undo, and audit records can contain local file paths. They are kept under ~/Library/Application Support/SparkClean and ~/Library/Logs/SparkClean, are never uploaded, and can be removed by deleting those folders.")
+                    )
 
-                    policySection("Third-Party Services",
-                        "GitHub is used only for optional release checks and user-requested downloads. SparkClean does not integrate with advertising networks or analytics platforms.")
+                    policySection(
+                        String(localized: "Third-Party Services"),
+                        String(localized: "GitHub is used only for optional release checks and user-requested downloads. SparkClean does not integrate with advertising networks or analytics platforms.")
+                    )
 
-                    policySection("Contact",
-                        "For questions about this privacy policy, visit github.com/georgekhananaev/spark-clean/issues")
+                    policySection(
+                        String(localized: "Contact"),
+                        String(localized: "For questions about this privacy policy, visit github.com/georgekhananaev/spark-clean/issues")
+                    )
                 }
             }
         }
@@ -1629,5 +1704,12 @@ struct PrivacyPolicyView: View {
 
 #Preview {
     ContentView()
+        .frame(width: 900, height: 650)
+}
+
+#Preview("Hebrew RTL") {
+    ContentView()
+        .environment(\.locale, Locale(identifier: "he"))
+        .environment(\.layoutDirection, .rightToLeft)
         .frame(width: 900, height: 650)
 }

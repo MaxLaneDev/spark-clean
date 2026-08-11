@@ -219,20 +219,19 @@ struct CustomAboutView: View {
             #elseif arch(x86_64)
             return "Intel (x86_64)"
             #else
-            return "Unknown"
+            return String(localized: "Unknown")
             #endif
         }()
         let ram = ProcessInfo.processInfo.physicalMemory
         let ramGB = String(format: "%.0f", Double(ram) / 1_073_741_824)
-        return """
-        macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion) \(arch)
-        Memory: \(ramGB) GB
-        Processors: \(ProcessInfo.processInfo.activeProcessorCount) cores
-        """
+        let system = "macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion) \(arch)"
+        let memory = String(localized: "Memory: \(ramGB) GB")
+        let processors = String(localized: "Processors: \(ProcessInfo.processInfo.activeProcessorCount) cores")
+        return [system, memory, processors].joined(separator: "\n")
     }
 
     private var buildInfo: String {
-        "Build #SC-\(buildNumber), \(version)"
+        String(localized: "Build #SC-\(buildNumber), \(version)")
     }
 
     var body: some View {
@@ -281,9 +280,9 @@ struct CustomAboutView: View {
 
             // System info section
             VStack(alignment: .leading, spacing: 12) {
-                InfoSection(title: "Build Information", content: buildInfo)
+                InfoSection(title: String(localized: "Build Information"), content: buildInfo)
 
-                InfoSection(title: "Developer", content: "George Khananaev")
+                InfoSection(title: String(localized: "Developer"), content: "George Khananaev")
 
                 HStack(spacing: 4) {
                     Text("SOURCE CODE")
@@ -296,7 +295,7 @@ struct CustomAboutView: View {
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.blue)
 
-                InfoSection(title: "Runtime", content: systemInfo)
+                InfoSection(title: String(localized: "Runtime"), content: systemInfo)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
@@ -434,7 +433,7 @@ struct TrashLeftoverSheet: View {
                                 .toggleStyle(.checkbox)
                                 .labelsHidden()
 
-                                Text(item.category)
+                                Text(AppLocalization.relatedPathCategory(item.category))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .frame(width: 100, alignment: .leading)
@@ -442,6 +441,7 @@ struct TrashLeftoverSheet: View {
                                     .font(.caption.monospaced())
                                     .lineLimit(1)
                                     .truncationMode(.middle)
+                                    .technicalTextDirection()
                                 Spacer()
                                 Text(CleanupManager.formatBytes(item.size))
                                     .font(.caption.monospaced())
@@ -472,7 +472,7 @@ struct TrashLeftoverSheet: View {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Button(cleanupError == nil ? "Clean Leftovers" : "Retry Remaining") {
+                    Button(cleanupError == nil ? String(localized: "Clean Leftovers") : String(localized: "Retry Remaining")) {
                         cleanLeftovers()
                     }
                     .buttonStyle(.borderedProminent)
@@ -543,14 +543,23 @@ struct TrashLeftoverSheet: View {
                         expectedIdentity: item.fileIdentity
                     ))
                 case .blocked(let reason):
-                    failures.append("\((item.path as NSString).lastPathComponent): \(reason)")
+                    let itemName = AppLocalization.isolateTechnicalText(
+                        (item.path as NSString).lastPathComponent
+                    )
+                    failures.append(String(localized: "\(itemName): \(reason)"))
                 case .skippedICloud:
-                    failures.append("\((item.path as NSString).lastPathComponent): iCloud item protected")
+                    let itemName = AppLocalization.isolateTechnicalText(
+                        (item.path as NSString).lastPathComponent
+                    )
+                    failures.append(String(localized: "\(itemName): iCloud item protected"))
                 case .failed(let error):
-                    if error == "Item no longer exists" {
+                    if error == FileRemover.itemNoLongerExistsError {
                         completed.insert(item.path)
                     } else {
-                        failures.append("\((item.path as NSString).lastPathComponent): \(error)")
+                        let itemName = AppLocalization.isolateTechnicalText(
+                            (item.path as NSString).lastPathComponent
+                        )
+                        failures.append(String(localized: "\(itemName): \(error)"))
                     }
                 }
             }
@@ -558,7 +567,7 @@ struct TrashLeftoverSheet: View {
             if !needsAdmin.isEmpty {
                 let admin = remover.moveToTrashWithAdministratorPrivileges(
                     needsAdmin,
-                    confirmationTitle: "\(appName) Leftovers Need Administrator Access"
+                    confirmationTitle: String(localized: "\(appName) Leftovers Need Administrator Access")
                 )
                 for removal in admin.removals {
                     completed.insert(removal.originalPath)
@@ -572,7 +581,9 @@ struct TrashLeftoverSheet: View {
                     )
                 }
                 failures.append(contentsOf: admin.failures)
-                if admin.wasCancelled { failures.append("Administrator cleanup was cancelled") }
+                if admin.wasCancelled {
+                    failures.append(String(localized: "Administrator cleanup was cancelled"))
+                }
             }
             recorder.finish()
 
@@ -584,7 +595,7 @@ struct TrashLeftoverSheet: View {
                 cleaned = failureCount == 0
                 cleanupError = failureCount == 0
                     ? nil
-                    : "\(failureCount) item(s) could not be removed."
+                    : String(localized: "\(failureCount) item(s) could not be removed.")
                 isCleaning = false
             }
         }

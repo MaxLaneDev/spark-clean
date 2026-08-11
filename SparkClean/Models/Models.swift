@@ -341,6 +341,10 @@ struct RelatedPath: Identifiable {
     let fileIdentity: FileRemover.FileIdentity?
     var isSelected: Bool = true
 
+    var displayCategory: String {
+        AppLocalization.relatedPathCategory(category)
+    }
+
     init(
         path: String,
         category: String,
@@ -376,6 +380,12 @@ struct ReleaseNote: Identifiable {
     let version: String
     let date: String
     let notes: [String]
+
+    init(version: String, date: String.LocalizationValue, notes: [String.LocalizationValue]) {
+        self.version = version
+        self.date = String(localized: date)
+        self.notes = notes.map { String(localized: $0) }
+    }
 }
 
 // MARK: - Known App Data Paths
@@ -384,6 +394,16 @@ struct KnownAppDataEntry {
     let path: String
     let description: String
     let safetyNote: String
+
+    init(
+        path: String,
+        description: String.LocalizationValue,
+        safetyNote: String.LocalizationValue
+    ) {
+        self.path = path
+        self.description = String(localized: description)
+        self.safetyNote = String(localized: safetyNote)
+    }
 }
 
 enum KnownAppData {

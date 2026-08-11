@@ -29,14 +29,14 @@ struct DiskMapView: View {
                         capacityCard(snapshot)
                         dataVolumeSection(snapshot)
                         entrySection(
-                            title: "Your files",
+                            title: String(localized: "Your files"),
                             subtitle: NSHomeDirectory(),
                             entries: snapshot.homeRoots,
                             comparisonSize: snapshot.dataVolumeUsedSpace
                         )
                         entrySection(
-                            title: "Your Library",
-                            subtitle: "~/Library — app data, containers, messages, mail, and caches",
+                            title: String(localized: "Your Library"),
+                            subtitle: String(localized: "~/Library — app data, containers, messages, mail, and caches"),
                             entries: snapshot.libraryRoots,
                             comparisonSize: snapshot.dataVolumeUsedSpace
                         )
@@ -77,8 +77,9 @@ struct DiskMapView: View {
                     .fontWeight(.bold)
                 if let snapshot = manager.snapshot {
                     Text(
-                        "\(CleanupManager.formatBytes(snapshot.containerUsedSpace)) used of "
-                        + "\(CleanupManager.formatBytes(snapshot.containerTotalSpace))"
+                        String(
+                            localized: "\(CleanupManager.formatBytes(snapshot.containerUsedSpace)) used of \(CleanupManager.formatBytes(snapshot.containerTotalSpace))"
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -97,7 +98,7 @@ struct DiskMapView: View {
                 }
             } label: {
                 Label(
-                    manager.isScanning ? "Cancel" : "Analyze Disk",
+                    manager.isScanning ? String(localized: "Cancel") : String(localized: "Analyze Disk"),
                     systemImage: manager.isScanning ? "xmark.circle" : "magnifyingglass"
                 )
             }
@@ -138,7 +139,11 @@ struct DiskMapView: View {
                 .foregroundStyle(.orange)
                 .font(.title3)
             VStack(alignment: .leading, spacing: 3) {
-                Text(snapshot.hasFullDiskAccess ? "Some protected space remains" : "Full Disk Access needed")
+                Text(
+                    snapshot.hasFullDiskAccess
+                        ? String(localized: "Some protected space remains")
+                        : String(localized: "Full Disk Access needed")
+                )
                     .font(.callout.weight(.semibold))
                 Text(message)
                     .font(.caption)
@@ -199,10 +204,10 @@ struct DiskMapView: View {
             .frame(height: 18)
 
             HStack(spacing: 28) {
-                metric("Used", snapshot.containerUsedSpace, color: .indigo)
-                metric("Free", snapshot.containerFreeSpace, color: .green)
-                metric("Data volume", snapshot.dataVolumeUsedSpace, color: .blue)
-                metric("Readable files", snapshot.measuredDataFileSpace, color: .teal)
+                metric(String(localized: "Used"), snapshot.containerUsedSpace, color: .indigo)
+                metric(String(localized: "Free"), snapshot.containerFreeSpace, color: .green)
+                metric(String(localized: "Data volume"), snapshot.dataVolumeUsedSpace, color: .blue)
+                metric(String(localized: "Readable files"), snapshot.measuredDataFileSpace, color: .teal)
             }
         }
         .padding(18)
@@ -227,13 +232,13 @@ struct DiskMapView: View {
     private func dataVolumeSection(_ snapshot: DiskMapSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeading(
-                "Data volume",
-                subtitle: "Non-overlapping top-level locations — not just cleanup candidates"
+                String(localized: "Data volume"),
+                subtitle: String(localized: "Non-overlapping top-level locations — not just cleanup candidates")
             )
 
             if snapshot.unaccountedDataSpace > 0 {
                 specialRow(
-                    name: "Protected & APFS-managed space",
+                    name: String(localized: "Protected & APFS-managed space"),
                     description: protectedDescription(snapshot),
                     size: snapshot.unaccountedDataSpace,
                     icon: "lock.square.stack.fill",
@@ -248,8 +253,8 @@ struct DiskMapView: View {
 
             if snapshot.sharedBlockOvercount > 0 {
                 specialRow(
-                    name: "Shared APFS clone records",
-                    description: "Folder totals overlap by this amount; APFS stores the shared blocks only once.",
+                    name: String(localized: "Shared APFS clone records"),
+                    description: String(localized: "Folder totals overlap by this amount; APFS stores the shared blocks only once."),
                     size: snapshot.sharedBlockOvercount,
                     icon: "square.on.square",
                     color: .purple,
@@ -283,8 +288,8 @@ struct DiskMapView: View {
     private func apfsVolumesSection(_ snapshot: DiskMapSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeading(
-                "APFS volumes",
-                subtitle: "macOS shares one physical container across these volumes"
+                String(localized: "APFS volumes"),
+                subtitle: String(localized: "macOS shares one physical container across these volumes")
             )
             ForEach(snapshot.volumes) { volume in
                 HStack(spacing: 12) {
@@ -308,8 +313,8 @@ struct DiskMapView: View {
             }
             if snapshot.apfsContainerOverhead > 0 {
                 specialRow(
-                    name: "APFS container metadata",
-                    description: "Filesystem metadata not assigned to an individual APFS volume.",
+                    name: String(localized: "APFS container metadata"),
+                    description: String(localized: "Filesystem metadata not assigned to an individual APFS volume."),
                     size: snapshot.apfsContainerOverhead,
                     icon: "cylinder.split.1x2",
                     color: .secondary,
@@ -404,8 +409,7 @@ struct DiskMapView: View {
                 )
         )
         .accessibilityLabel(
-            "\(name), \(CleanupManager.formatBytes(size)), "
-            + "\(Int(Double(size) / Double(max(1, comparisonSize)) * 100)) percent"
+            String(localized: "\(name), \(CleanupManager.formatBytes(size)), \(Int(Double(size) / Double(max(1, comparisonSize)) * 100)) percent")
         )
     }
 
@@ -413,19 +417,31 @@ struct DiskMapView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.headline)
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if subtitle == NSHomeDirectory() {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .technicalTextDirection()
+            } else {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     private func auditFooter(_ snapshot: DiskMapSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(
-                "Analyzed \(snapshot.generatedAt.formatted(date: .abbreviated, time: .standard)) "
-                + "in \(String(format: "%.1f", snapshot.scanDuration)) seconds."
+                String(
+                    localized: "Analyzed \(snapshot.generatedAt.formatted(date: .abbreviated, time: .standard)) in \(String(format: "%.1f", snapshot.scanDuration)) seconds."
+                )
             )
-            Text("Latest audit: ~/Library/Logs/SparkClean/latest-storage-map.json")
+            HStack(spacing: 4) {
+                Text("Latest audit:")
+                Text("~/Library/Logs/SparkClean/latest-storage-map.json")
+                    .technicalTextDirection()
+            }
             Text("Folder values are allocated-size estimates. APFS volume totals above are authoritative.")
         }
         .font(.caption2)
@@ -485,8 +501,8 @@ struct DiskMapView: View {
 
     private func protectedDescription(_ snapshot: DiskMapSnapshot) -> String {
         if !snapshot.hasFullDiskAccess {
-            return "Files hidden by macOS privacy controls plus filesystem metadata and shared APFS blocks."
+            return String(localized: "Files hidden by macOS privacy controls plus filesystem metadata and shared APFS blocks.")
         }
-        return "macOS-owned files, filesystem metadata, snapshots, and blocks a folder walk cannot safely assign."
+        return String(localized: "macOS-owned files, filesystem metadata, snapshots, and blocks a folder walk cannot safely assign.")
     }
 }

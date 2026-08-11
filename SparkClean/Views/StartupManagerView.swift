@@ -25,6 +25,14 @@ struct StartupItem: Identifiable {
         case userAgent = "Launch Agent"
         case systemAgent = "System Agent"
         case systemDaemon = "Daemon"
+
+        var displayName: String {
+            switch self {
+            case .userAgent: String(localized: "Launch Agent")
+            case .systemAgent: String(localized: "System Agent")
+            case .systemDaemon: String(localized: "Daemon")
+            }
+        }
     }
 }
 
@@ -150,7 +158,9 @@ class StartupManager {
                         self?.items[currentIndex].isEnabled = !shouldDisable
                     }
                 } else {
-                    self?.lastError = "Could not \(shouldDisable ? "disable" : "enable") \(displayName). launchctl did not complete successfully."
+                    self?.lastError = shouldDisable
+                        ? String(localized: "Could not disable \(displayName). launchctl did not complete successfully.")
+                        : String(localized: "Could not enable \(displayName). launchctl did not complete successfully.")
                 }
             }
         }
@@ -379,7 +389,7 @@ struct StartupItemRow: View {
                     Text(item.displayName)
                         .font(.body.weight(.medium))
 
-                    Text(item.type.rawValue)
+                    Text(item.type.displayName)
                         .font(.caption2)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -392,12 +402,14 @@ struct StartupItemRow: View {
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .technicalTextDirection()
 
                 if let program = item.programPath {
                     Text(program)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                        .technicalTextDirection()
                 }
             }
 

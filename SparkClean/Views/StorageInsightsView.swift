@@ -52,7 +52,7 @@ struct StorageInsightsView: View {
                 }
             } label: {
                 Label(
-                    manager.isMeasuring ? "Cancel" : "Refresh",
+                    manager.isMeasuring ? String(localized: "Cancel") : String(localized: "Refresh"),
                     systemImage: manager.isMeasuring ? "xmark.circle" : "arrow.clockwise"
                 )
             }
@@ -116,7 +116,7 @@ struct StorageInsightsView: View {
                             .font(.caption2).foregroundStyle(.orange)
                     } else if let delta = item.delta, delta != 0 {
                         let up = delta > 0
-                        Label("\(up ? "+" : "−")\(CleanupManager.formatBytes(abs(delta))) since last check",
+                        Label(String(localized: "\(up ? "+" : "−")\(CleanupManager.formatBytes(abs(delta))) since last check"),
                               systemImage: up ? "arrow.up.right" : "arrow.down.right")
                             .font(.caption2)
                             .foregroundStyle(up ? .orange : .green)

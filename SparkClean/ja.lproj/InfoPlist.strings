@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "SparkClean";
+"NSAppleEventsUsageDescription" = "SparkCleanは、管理者権限が必要なクリーンアップまたはメンテナンス操作を承認した場合にのみApple Eventsを使用します。";
+"NSDesktopFolderUsageDescription" = "SparkCleanは、ストレージの空き容量を増やすためにデスクトップ内の古いスクリーンショットをスキャンします。";
+"NSDocumentsFolderUsageDescription" = "SparkCleanは、ストレージの空き容量を増やすために書類フォルダ内の古いスクリーンショットをスキャンします。";
+"NSDownloadsFolderUsageDescription" = "SparkCleanは、ストレージの空き容量を増やすためにダウンロードフォルダ内の古いファイルとインストーラをスキャンします。";
+"NSSystemAdministrationUsageDescription" = "SparkCleanは、明示的に確認したクリーンアップまたはメンテナンス操作にのみ管理者の承認を求めます。";

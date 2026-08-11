@@ -181,12 +181,12 @@ class CleanupManager {
                 self.cancelLock.withLock { $0 = true }
                 self.resetScannedPaths()
                 Task { @MainActor in
-                    self.scanErrors.append("Scan cancelled: system memory pressure critical")
+                    self.scanErrors.append(String(localized: "Scan cancelled: system memory pressure critical"))
                 }
             } else if event.contains(.warning) {
                 // Warning: just log it — the autoreleasepool fixes should handle this
                 Task { @MainActor in
-                    self.scanErrors.append("Warning: elevated memory pressure detected")
+                    self.scanErrors.append(String(localized: "Warning: elevated memory pressure detected"))
                 }
             }
         }
@@ -1036,53 +1036,53 @@ class CleanupManager {
         // so the progress estimate can be derived from the actual filtered set.
         typealias SmartScan = (label: String, group: CategoryGroup, run: () async -> CleanupCategory?)
         var smartScans: [SmartScan] = [
-            ("Scanning stale temporary files...", .system, { await self.scanStaleTemporaryFiles() }),
-            ("Scanning all app caches...",       .system,  { await self.scanAllCaches() }),
-            ("Scanning shared container caches...", .system, { await self.scanGroupContainerCaches() }),
-            ("Scanning system caches...",        .system,  { await self.scanSystemCaches() }),
-            ("Scanning old screenshots...",      .system,  { await self.scanOldScreenshots() }),
-            ("Scanning old downloads...",        .system,  { await self.scanOldDownloads() }),
-            ("Scanning Electron app caches...",  .applications, { await self.scanElectronCaches() }),
-            ("Scanning Next.js build artifacts...", .developer, { await self.scanNextJSBuildArtifacts() }),
+            (String(localized: "Scanning stale temporary files..."), .system, { await self.scanStaleTemporaryFiles() }),
+            (String(localized: "Scanning all app caches..."), .system, { await self.scanAllCaches() }),
+            (String(localized: "Scanning shared container caches..."), .system, { await self.scanGroupContainerCaches() }),
+            (String(localized: "Scanning system caches..."), .system, { await self.scanSystemCaches() }),
+            (String(localized: "Scanning old screenshots..."), .system, { await self.scanOldScreenshots() }),
+            (String(localized: "Scanning old downloads..."), .system, { await self.scanOldDownloads() }),
+            (String(localized: "Scanning Electron app caches..."), .applications, { await self.scanElectronCaches() }),
+            (String(localized: "Scanning Next.js build artifacts..."), .developer, { await self.scanNextJSBuildArtifacts() }),
         ]
         if scanOldInstallers {
-            smartScans.append(("Scanning installer files...", .storage, { await self.scanInstallerFiles() }))
+            smartScans.append((String(localized: "Scanning installer files..."), .storage, { await self.scanInstallerFiles() }))
         }
         if scanDocker {
-            smartScans.append(("Scanning Docker images...",      .docker, { await self.scanDockerImages() }))
-            smartScans.append(("Scanning Docker containers...",  .docker, { await self.scanDockerStoppedContainers() }))
-            smartScans.append(("Scanning Docker build cache...", .docker, { await self.scanDockerBuildCache() }))
+            smartScans.append((String(localized: "Scanning Docker images..."), .docker, { await self.scanDockerImages() }))
+            smartScans.append((String(localized: "Scanning Docker containers..."), .docker, { await self.scanDockerStoppedContainers() }))
+            smartScans.append((String(localized: "Scanning Docker build cache..."), .docker, { await self.scanDockerBuildCache() }))
         }
-        smartScans.append(("Scanning Ollama models...",     .developer,       { await self.scanOllamaModels() }))
+        smartScans.append((String(localized: "Scanning Ollama models..."), .developer, { await self.scanOllamaModels() }))
         if scanUnusedApps {
-            smartScans.append(("Scanning unused apps...",   .applications,    { await self.scanUnusedApplications() }))
+            smartScans.append((String(localized: "Scanning unused apps..."), .applications, { await self.scanUnusedApplications() }))
         }
         if scanNodeModules {
-            smartScans.append(("Scanning node_modules...",  .packageManagers, { await self.scanNodeModules() }))
+            smartScans.append((String(localized: "Scanning node_modules..."), .packageManagers, { await self.scanNodeModules() }))
         }
-        smartScans.append(("Scanning mail attachments...",  .system,          { await self.scanMailAttachments() }))
-        smartScans.append(("Scanning app leftovers...",     .applications,    { await self.scanOrphanedAppData() }))
-        smartScans.append(("Scanning iOS software updates...", .system,       { await self.scanIPSWFiles() }))
+        smartScans.append((String(localized: "Scanning mail attachments..."), .system, { await self.scanMailAttachments() }))
+        smartScans.append((String(localized: "Scanning app leftovers..."), .applications, { await self.scanOrphanedAppData() }))
+        smartScans.append((String(localized: "Scanning iOS software updates..."), .system, { await self.scanIPSWFiles() }))
         if scanIOSBackups {
-            smartScans.append(("Scanning iOS backups...",   .system,          { await self.scanIOSBackups() }))
+            smartScans.append((String(localized: "Scanning iOS backups..."), .system, { await self.scanIOSBackups() }))
         }
         if scanIMessage {
-            smartScans.append(("Scanning iMessage attachments...", .system,   { await self.scanIMessageAttachments() }))
+            smartScans.append((String(localized: "Scanning iMessage attachments..."), .system, { await self.scanIMessageAttachments() }))
         }
         if scanBrokenSymlinks {
-            smartScans.append(("Scanning broken symlinks...", .system,        { await self.scanBrokenSymlinks() }))
+            smartScans.append((String(localized: "Scanning broken symlinks..."), .system, { await self.scanBrokenSymlinks() }))
         }
         if scanScreenRecordings {
-            smartScans.append(("Scanning screen recordings...", .storage,     { await self.scanScreenRecordings() }))
+            smartScans.append((String(localized: "Scanning screen recordings..."), .storage, { await self.scanScreenRecordings() }))
         }
         if scanRustTargets {
-            smartScans.append(("Scanning Rust target dirs...", .packageManagers, { await self.scanRustTargets() }))
+            smartScans.append((String(localized: "Scanning Rust target dirs..."), .packageManagers, { await self.scanRustTargets() }))
         }
         if scanVenvs {
-            smartScans.append(("Scanning virtual environments...", .packageManagers, { await self.scanVirtualEnvironments() }))
+            smartScans.append((String(localized: "Scanning virtual environments..."), .packageManagers, { await self.scanVirtualEnvironments() }))
         }
         if scanLargeFiles {
-            smartScans.append(("Scanning large files...",   .largeFiles,      { await self.scanLargeFiles() }))
+            smartScans.append((String(localized: "Scanning large files..."), .largeFiles, { await self.scanLargeFiles() }))
         }
 
         // Restrict to a single group's scanners when doing an individual rescan.
@@ -1516,8 +1516,8 @@ class CleanupManager {
             if !runningNames.isEmpty {
                 let names = runningNames.joined(separator: ", ")
                 let message = category.group == .privacy
-                    ? "\(category.name): Blocked because \(names) is running. Quit the app before cleaning live privacy databases."
-                    : "\(category.name): Skipped because \(names) is running. Quit the app and try again."
+                    ? String(localized: "\(category.name): Blocked because \(names) is running. Quit the app before cleaning live privacy databases.")
+                    : String(localized: "\(category.name): Skipped because \(names) is running. Quit the app and try again.")
                 await MainActor.run {
                     cleanFailCount += 1
                     cleanErrors.append(message)
@@ -1547,7 +1547,7 @@ class CleanupManager {
                         cleanSuccessCount += 1
                     } else {
                         cleanFailCount += 1
-                        cleanErrors.append("Failed to clean Docker resource: \(category.name)")
+                        cleanErrors.append(String(localized: "Failed to clean Docker resource: \(category.name)"))
                     }
                     cleanProgress = Double(catIndex + 1) / Double(totalCategories)
                 }
@@ -1588,7 +1588,7 @@ class CleanupManager {
                     } else {
                         cleanFailCount += 1
                         cleanErrors.append(contentsOf: outcome.failedModels.map {
-                            "\(category.name): Failed to remove \($0)"
+                            String(localized: "\(category.name): Failed to remove \($0)")
                         })
                     }
                     cleanProgress = Double(catIndex + 1) / Double(totalCategories)
@@ -1672,10 +1672,12 @@ class CleanupManager {
                             record(removal)
                         case .blocked(let reason):
                             failedConcretePaths.insert(url.path)
-                            localErrors.append("\(categoryName): Blocked \(url.lastPathComponent) — \(reason)")
+                            let itemName = AppLocalization.isolateTechnicalText(url.lastPathComponent)
+                            localErrors.append(String(localized: "\(categoryName): Blocked \(itemName) — \(reason)"))
                         case .skippedICloud:
                             failedConcretePaths.insert(url.path)
-                            localErrors.append("\(categoryName): Skipped iCloud-synced item — \(url.lastPathComponent)")
+                            let itemName = AppLocalization.isolateTechnicalText(url.lastPathComponent)
+                            localErrors.append(String(localized: "\(categoryName): Skipped iCloud-synced item — \(itemName)"))
                         case .needsAdmin(let path):
                             needsAdmin.append(FileRemover.AdminRequest(
                                 path: path,
@@ -1685,12 +1687,13 @@ class CleanupManager {
                                 expectedIdentity: expectedIdentity
                             ))
                         case .failed(let message):
-                            if message == "Item no longer exists" {
+                            if message == FileRemover.itemNoLongerExistsError {
                                 vanishedPaths.insert(url.path)
                             } else {
                                 failedConcretePaths.insert(url.path)
                             }
-                            localErrors.append("\(categoryName): Failed to remove \(url.lastPathComponent) — \(message)")
+                            let itemName = AppLocalization.isolateTechnicalText(url.lastPathComponent)
+                            localErrors.append(String(localized: "\(categoryName): Failed to remove \(itemName) — \(message)"))
                         }
                     }
 
@@ -1699,15 +1702,21 @@ class CleanupManager {
                             if let expectedIdentity = knownIdentities[path],
                                FileRemover.fileIdentity(at: path) != expectedIdentity {
                                 failedConcretePaths.insert(path)
+                                let itemName = AppLocalization.isolateTechnicalText(
+                                    (path as NSString).lastPathComponent
+                                )
                                 localErrors.append(
-                                    "\(categoryName): Blocked \((path as NSString).lastPathComponent) — a different item replaced the scanned root"
+                                    String(localized: "\(categoryName): Blocked \(itemName) — a different item replaced the scanned root")
                                 )
                                 continue
                             }
                             var isDirectory: ObjCBool = false
                             guard fm.fileExists(atPath: path, isDirectory: &isDirectory) else {
                                 vanishedPaths.insert(path)
-                                localErrors.append("\(categoryName): Item no longer exists — \((path as NSString).lastPathComponent)")
+                                let itemName = AppLocalization.isolateTechnicalText(
+                                    (path as NSString).lastPathComponent
+                                )
+                                localErrors.append(String(localized: "\(categoryName): Item no longer exists — \(itemName)"))
                                 continue
                             }
                             if isDirectory.boolValue {
@@ -1716,7 +1725,10 @@ class CleanupManager {
                                     contents = try fm.contentsOfDirectory(atPath: path)
                                 } catch {
                                     failedConcretePaths.insert(path)
-                                    localErrors.append("\(categoryName): Could not read \((path as NSString).lastPathComponent) — \(error.localizedDescription)")
+                                    let itemName = AppLocalization.isolateTechnicalText(
+                                        (path as NSString).lastPathComponent
+                                    )
+                                    localErrors.append(String(localized: "\(categoryName): Could not read \(itemName) — \(error.localizedDescription)"))
                                     continue
                                 }
                                 for item in contents {
@@ -1774,7 +1786,7 @@ class CleanupManager {
                     if !needsAdmin.isEmpty {
                         let admin = remover.moveToTrashWithAdministratorPrivileges(
                             needsAdmin,
-                            confirmationTitle: "\(categoryName) Needs Administrator Access"
+                            confirmationTitle: String(localized: "\(categoryName) Needs Administrator Access")
                         )
                         for removal in admin.removals {
                             record(removal)
@@ -1789,10 +1801,10 @@ class CleanupManager {
                             }
                         }
                         localErrors.append(contentsOf: admin.failures.map {
-                            "\(categoryName): \($0)"
+                            String(localized: "\(categoryName): \($0)")
                         })
                         if admin.wasCancelled {
-                            localErrors.append("\(categoryName): Administrator cleanup was cancelled")
+                            localErrors.append(String(localized: "\(categoryName): Administrator cleanup was cancelled"))
                         }
                     }
 
@@ -2209,13 +2221,13 @@ class CleanupManager {
         let paths = result.breakdown.map(\.path)
         let totalSize = result.breakdown.reduce(0 as Int64) { $0 + $1.size }
         let suffix = result.wasCancelled
-            ? " · partial scan (cancelled)"
-            : (result.hitWatchdog ? " · partial scan (safety limit)" : "")
+            ? String(localized: " · partial scan (cancelled)")
+            : (result.hitWatchdog ? String(localized: " · partial scan (safety limit)") : "")
         return CleanupCategory(
-            name: "Stale Temporary Files",
+            name: String(localized: "Stale Temporary Files"),
             icon: "clock.arrow.circlepath",
             color: .red,
-            description: "\(paths.count) direct temporary file(s) older than 7 days\(suffix)",
+            description: String(localized: "\(paths.count) direct temporary file(s) older than 7 days\(suffix)"),
             group: .system,
             safetyLevel: .review,
             paths: paths,
@@ -2284,8 +2296,8 @@ class CleanupManager {
                 for path in paths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Other App Caches", icon: "archivebox", color: .blue,
-                    description: "\(paths.count) app caches — safe to remove, rebuilt automatically",
+                    name: String(localized: "Other App Caches"), icon: "archivebox", color: .blue,
+                    description: String(localized: "\(paths.count) app caches — safe to remove, rebuilt automatically"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: sorted,
                     deleteChildrenOnly: true,
@@ -2347,8 +2359,8 @@ class CleanupManager {
                 for path in paths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Shared Container Caches", icon: "archivebox.fill", color: .blue,
-                    description: "\(paths.count) sandboxed-app cache(s) — safe to remove, rebuilt automatically",
+                    name: String(localized: "Shared Container Caches"), icon: "archivebox.fill", color: .blue,
+                    description: String(localized: "\(paths.count) sandboxed-app cache(s) — safe to remove, rebuilt automatically"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: breakdown,
                     deleteChildrenOnly: true,
@@ -2382,10 +2394,10 @@ class CleanupManager {
         let paths = sorted.map(\.path)
         for path in paths { insertScannedPath(path) }
         return CleanupCategory(
-            name: "Other Electron App Caches",
+            name: String(localized: "Other Electron App Caches"),
             icon: "bolt.square",
             color: .blue,
-            description: "\(paths.count) Electron cache directories — rebuilt automatically",
+            description: String(localized: "\(paths.count) Electron cache directories — rebuilt automatically"),
             group: .applications,
             safetyLevel: .safe,
             paths: paths,
@@ -2493,8 +2505,8 @@ class CleanupManager {
                 for path in paths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "System Caches", icon: "internaldrive.fill", color: .blue,
-                    description: "\(paths.count) system-level caches — safe to remove",
+                    name: String(localized: "System Caches"), icon: "internaldrive.fill", color: .blue,
+                    description: String(localized: "\(paths.count) system-level caches — safe to remove"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: sorted,
                     deleteChildrenOnly: false,
@@ -2598,8 +2610,8 @@ class CleanupManager {
                 let totalFileCount = sorted.reduce(0) { $0 + $1.fileCount }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Old Downloads (>\(olderThanDays)d)", icon: "arrow.down.circle.fill", color: .blue,
-                    description: "\(filePaths.count) old items in Downloads — review before deleting",
+                    name: String(localized: "Old Downloads (>\(olderThanDays)d)"), icon: "arrow.down.circle.fill", color: .blue,
+                    description: String(localized: "\(filePaths.count) old items in Downloads — review before deleting"),
                     group: .system, safetyLevel: .review,
                     paths: filePaths, breakdown: sorted,
                     deleteChildrenOnly: false,
@@ -2669,8 +2681,8 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Old Screenshots (>\(olderThanDays)d)", icon: "camera.viewfinder", color: .teal,
-                    description: "\(filePaths.count) old screenshots — likely safe to delete",
+                    name: String(localized: "Old Screenshots (>\(olderThanDays)d)"), icon: "camera.viewfinder", color: .teal,
+                    description: String(localized: "\(filePaths.count) old screenshots — likely safe to delete"),
                     group: .system, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -2756,7 +2768,7 @@ class CleanupManager {
                             size: size,
                             fileCount: 1,
                             displayName: isInstalled
-                                ? "\(url.lastPathComponent) · matching app installed"
+                                ? String(localized: "\(AppLocalization.isolateTechnicalText(url.lastPathComponent)) · matching app installed")
                                 : url.lastPathComponent
                         ))
                         totalSize += size
@@ -2771,8 +2783,8 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Old Installers (>\(olderThanDays)d)", icon: "doc.zipper", color: .brown,
-                    description: "\(filePaths.count) old DMG/PKG/MPKG/ISO/XIP or installer ZIP files — review before deleting",
+                    name: String(localized: "Old Installers (>\(olderThanDays)d)"), icon: "doc.zipper", color: .brown,
+                    description: String(localized: "\(filePaths.count) old DMG/PKG/MPKG/ISO/XIP or installer ZIP files — review before deleting"),
                     group: .storage, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -2875,8 +2887,8 @@ class CleanupManager {
         }
 
         return CleanupCategory(
-            name: "Unused Apps (>\(thresholdDays)d)", icon: "app.dashed", color: .gray,
-            description: "\(appPaths.count) apps not opened in \(thresholdDays)+ days",
+            name: String(localized: "Unused Apps (>\(thresholdDays)d)"), icon: "app.dashed", color: .gray,
+            description: String(localized: "\(appPaths.count) apps not opened in \(thresholdDays)+ days"),
             group: .applications, safetyLevel: .caution,
             paths: appPaths, allowedRoots: appPaths,
             associatedBundleIDs: associatedBundleIDs,
@@ -2975,8 +2987,8 @@ class CleanupManager {
         breakdown.sort { $0.size > $1.size }
 
         return CleanupCategory(
-            name: "Docker Dangling Images", icon: "shippingbox.circle", color: .blue,
-            description: "\(breakdown.count) untagged images not referenced by a container",
+            name: String(localized: "Docker Dangling Images"), icon: "shippingbox.circle", color: .blue,
+            description: String(localized: "\(breakdown.count) untagged images not referenced by a container"),
             group: .docker, safetyLevel: .review,
             paths: [], breakdown: breakdown,
             deleteChildrenOnly: false, isDockerResource: true,
@@ -3014,8 +3026,8 @@ class CleanupManager {
         breakdown.sort { $0.size > $1.size }
 
         return CleanupCategory(
-            name: "Docker Stopped Containers", icon: "stop.circle", color: .orange,
-            description: "\(breakdown.count) stopped containers",
+            name: String(localized: "Docker Stopped Containers"), icon: "stop.circle", color: .orange,
+            description: String(localized: "\(breakdown.count) stopped containers"),
             group: .docker, safetyLevel: .safe,
             paths: [], breakdown: breakdown,
             deleteChildrenOnly: false, isDockerResource: true,
@@ -3036,11 +3048,16 @@ class CleanupManager {
                 let reclaimableSize = Self.parseDockerSize(parts[2])
                 guard reclaimableSize > 0 else { return nil }
                 return CleanupCategory(
-                    name: "Docker Build Cache", icon: "hammer.circle", color: .teal,
-                    description: "Build cache — \(parts[2]) reclaimable",
+                    name: String(localized: "Docker Build Cache"), icon: "hammer.circle", color: .teal,
+                    description: String(localized: "Build cache — \(parts[2]) reclaimable"),
                     group: .docker, safetyLevel: .safe,
                     paths: [],
-                    breakdown: [PathStat(path: "Build cache (\(parts[2]) reclaimable)", size: reclaimableSize, fileCount: 1)],
+                    breakdown: [PathStat(
+                        path: "Build cache (\(parts[2]) reclaimable)",
+                        size: reclaimableSize,
+                        fileCount: 1,
+                        displayName: String(localized: "Build cache (\(parts[2]) reclaimable)")
+                    )],
                     deleteChildrenOnly: false, isDockerResource: true,
                     dockerCleanCommand: ["builder", "prune", "-f"],
                     size: reclaimableSize, fileCount: 1, isSelected: false
@@ -3130,9 +3147,12 @@ class CleanupManager {
         guard !breakdown.isEmpty else { return nil }
         breakdown.sort { $0.size > $1.size }
 
+        let modelDescription = breakdown.count == 1
+            ? String(localized: "1 model installed — \(Self.formatBytes(totalSize))")
+            : String(localized: "\(breakdown.count) models installed — \(Self.formatBytes(totalSize))")
         return CleanupCategory(
-            name: "Ollama Models", icon: "brain.head.profile", color: .purple,
-            description: "\(breakdown.count) model\(breakdown.count == 1 ? "" : "s") installed — \(Self.formatBytes(totalSize))",
+            name: String(localized: "Ollama Models"), icon: "brain.head.profile", color: .purple,
+            description: modelDescription,
             group: .developer, safetyLevel: .review,
             paths: [], breakdown: breakdown,
             deleteChildrenOnly: false, isOllamaResource: true,
@@ -3202,11 +3222,14 @@ class CleanupManager {
 
                 breakdown.sort { $0.size > $1.size }
                 for path in found { self.insertScannedPath(path) }
+                let artifactDescription = found.count == 1
+                    ? String(localized: "1 .next build directory — rebuilt by the next Next.js build")
+                    : String(localized: "\(found.count) .next build directories — rebuilt by the next Next.js build")
                 continuation.resume(returning: CleanupCategory(
-                    name: "Next.js Build Artifacts",
+                    name: String(localized: "Next.js Build Artifacts"),
                     icon: "hammer.fill",
                     color: .primary,
-                    description: "\(found.count) .next build director\(found.count == 1 ? "y" : "ies") — rebuilt by the next Next.js build",
+                    description: artifactDescription,
                     group: .developer,
                     safetyLevel: .safe,
                     paths: found,
@@ -3360,8 +3383,8 @@ class CleanupManager {
                 for path in found { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "node_modules", icon: "shippingbox.fill", color: .green,
-                    description: "\(found.count) node_modules — run npm install to restore",
+                    name: String(localized: "node_modules"), icon: "shippingbox.fill", color: .green,
+                    description: String(localized: "\(found.count) node_modules — run npm install to restore"),
                     group: .packageManagers, safetyLevel: .safe,
                     paths: found, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -3493,10 +3516,13 @@ class CleanupManager {
 
                 breakdown.sort { $0.size > $1.size }
                 for path in found { self.insertScannedPath(path) }
+                let targetDescription = found.count == 1
+                    ? String(localized: "1 target directory — run cargo build to restore")
+                    : String(localized: "\(found.count) target directories — run cargo build to restore")
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Rust target directories", icon: "gearshape.2", color: .orange,
-                    description: "\(found.count) target dir\(found.count == 1 ? "" : "s") — run cargo build to restore",
+                    name: String(localized: "Rust target directories"), icon: "gearshape.2", color: .orange,
+                    description: targetDescription,
                     group: .packageManagers, safetyLevel: .safe,
                     paths: found, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -3611,8 +3637,8 @@ class CleanupManager {
                 }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Mail Attachments", icon: "envelope.badge.shield.half.filled", color: .blue,
-                    description: "Cached mail attachment downloads — re-downloaded from server",
+                    name: String(localized: "Mail Attachments"), icon: "envelope.badge.shield.half.filled", color: .blue,
+                    description: String(localized: "Cached mail attachment downloads — re-downloaded from server"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: breakdown,
                     deleteChildrenOnly: true,
@@ -3769,8 +3795,8 @@ class CleanupManager {
                 for path in orphanPaths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "App Leftovers", icon: "trash.slash", color: .purple,
-                    description: "\(orphanPaths.count) leftover files from uninstalled apps",
+                    name: String(localized: "App Leftovers"), icon: "trash.slash", color: .purple,
+                    description: String(localized: "\(orphanPaths.count) leftover files from uninstalled apps"),
                     group: .applications, safetyLevel: .review,
                     paths: orphanPaths, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -3948,10 +3974,10 @@ class CleanupManager {
                 let cappedSize = capped.reduce(0 as Int64) { $0 + $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Large Files (>\(thresholdMB) MB)", icon: "doc.fill", color: .orange,
+                    name: String(localized: "Large Files (>\(thresholdMB) MB)"), icon: "doc.fill", color: .orange,
                     description: filePaths.count > capped.count
-                        ? "\(capped.count) largest matches shown of \(filePaths.count) found"
-                        : "\(capped.count) large files across user directories",
+                        ? String(localized: "\(capped.count) largest matches shown of \(filePaths.count) found")
+                        : String(localized: "\(capped.count) large files across user directories"),
                     group: .largeFiles, safetyLevel: .review,
                     paths: cappedPaths, breakdown: capped,
                     deleteChildrenOnly: false,
@@ -4057,8 +4083,8 @@ class CleanupManager {
 
                 breakdown.sort { $0.size > $1.size }
                 continuation.resume(returning: CleanupCategory(
-                    name: "Virtual Environments", icon: "terminal", color: .green,
-                    description: "\(filePaths.count) Python/Ruby virtual environments",
+                    name: String(localized: "Virtual Environments"), icon: "terminal", color: .green,
+                    description: String(localized: "\(filePaths.count) Python/Ruby virtual environments"),
                     group: .packageManagers, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -4127,8 +4153,8 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "iOS Device Backups", icon: "iphone", color: .blue,
-                    description: "\(filePaths.count) device backup(s) — review before deleting",
+                    name: String(localized: "iOS Device Backups"), icon: "iphone", color: .blue,
+                    description: String(localized: "\(filePaths.count) device backup(s) — review before deleting"),
                     group: .system, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -4192,8 +4218,8 @@ class CleanupManager {
                 }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "iOS Software Updates", icon: "arrow.down.app", color: .blue,
-                    description: "Downloaded firmware files (IPSW) — no longer needed after update",
+                    name: String(localized: "iOS Software Updates"), icon: "arrow.down.app", color: .blue,
+                    description: String(localized: "Downloaded firmware files (IPSW) — no longer needed after update"),
                     group: .system, safetyLevel: .safe,
                     paths: filePaths, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -4226,8 +4252,8 @@ class CleanupManager {
                 }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "iMessage Attachments", icon: "message.fill", color: .green,
-                    description: "Cached message attachments — deleting creates 'Missing Attachment' placeholders in Messages. May re-download if Messages in iCloud is enabled.",
+                    name: String(localized: "iMessage Attachments"), icon: "message.fill", color: .green,
+                    description: String(localized: "Cached message attachments — deleting creates 'Missing Attachment' placeholders in Messages. May re-download if Messages in iCloud is enabled."),
                     group: .system, safetyLevel: .caution,
                     paths: [attachDir],
                     breakdown: [PathStat(path: attachDir, size: size, fileCount: count)],
@@ -4315,8 +4341,8 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Screen Recordings (>\(thresholdDays)d)", icon: "record.circle", color: .teal,
-                    description: "\(filePaths.count) old screen recordings over 50 MB",
+                    name: String(localized: "Screen Recordings (>\(thresholdDays)d)"), icon: "record.circle", color: .teal,
+                    description: String(localized: "\(filePaths.count) old screen recordings over 50 MB"),
                     group: .storage, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
                     deleteChildrenOnly: false,
@@ -4384,14 +4410,14 @@ class CleanupManager {
                 }
                 for path in paths { self.insertScannedPath(path) }
                 let suffix = result.wasCancelled
-                    ? " · partial scan (cancelled)"
+                    ? String(localized: " · partial scan (cancelled)")
                     : (result.hitWatchdog
-                        ? " · partial scan (safety limit)"
+                        ? String(localized: " · partial scan (safety limit)")
                         : "")
 
                 continuation.resume(returning: CleanupCategory(
-                    name: "Broken Symlinks (\(paths.count) found)", icon: "link", color: .gray,
-                    description: "Symbolic links pointing to nonexistent targets\(suffix)",
+                    name: String(localized: "Broken Symlinks (\(paths.count) found)"), icon: "link", color: .gray,
+                    description: String(localized: "Symbolic links pointing to nonexistent targets\(suffix)"),
                     group: .system, safetyLevel: .review,
                     paths: paths, allowedRoots: roots,
                     allowsSymbolicLinkItems: true,
@@ -4670,52 +4696,58 @@ class CleanupManager {
 
     func exportDetailedReport(verbose: Bool) -> String {
         let dateStr = Date().formatted(date: .long, time: .standard)
+        let reportTitle = String(localized: "SparkClean - Detailed Scan Audit Report")
+        let generated = String(localized: "Generated: \(dateStr)")
         var r = """
         ╔═══════════════════════════════════════════════════════════════════╗
-        ║  SparkClean - Detailed Scan Audit Report                        ║
-        ║  Generated: \(dateStr)\(String(repeating: " ", count: max(0, 40 - dateStr.count)))║
+        ║  \(reportTitle)
+        ║  \(generated)
         ╚═══════════════════════════════════════════════════════════════════╝
 
         """
 
         // System info
-        r += "SYSTEM INFORMATION\n"
+        r += String(localized: "SYSTEM INFORMATION") + "\n"
         r += String(repeating: "─", count: 60) + "\n"
-        r += "  macOS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
-        r += "  Machine:       \(Self.runCommand("/usr/sbin/sysctl", arguments: ["-n", "hw.model"]) ?? "Unknown")\n"
-        r += "  User:          \(NSUserName())\n"
-        r += "  Home:          \(Self.home)\n\n"
+        r += "  " + String(localized: "macOS Version:") + " \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
+        r += "  " + String(localized: "Machine:") + " \(Self.runCommand("/usr/sbin/sysctl", arguments: ["-n", "hw.model"]) ?? String(localized: "Unknown"))\n"
+        r += "  " + String(localized: "User:") + " \(NSUserName())\n"
+        r += "  " + String(localized: "Home:") + " \(AppLocalization.isolateTechnicalText(Self.home))\n\n"
 
         if let disk = diskUsage {
-            r += "DISK USAGE\n"
+            r += String(localized: "DISK USAGE") + "\n"
             r += String(repeating: "─", count: 60) + "\n"
-            r += "  Total Space:     \(Self.formatBytes(disk.totalSpace))\n"
-            r += "  Used Space:      \(Self.formatBytes(disk.usedSpace)) (\(String(format: "%.1f%%", disk.usedPercentage * 100)))\n"
-            r += "  Free Space:      \(Self.formatBytes(disk.freeSpace))\n"
-            r += "  Purgeable:       \(Self.formatBytes(disk.purgeableSpace))\n"
-            r += "  Reclaimable:     \(Self.formatBytes(overallSize))\n"
-            r += "  Selected:        \(Self.formatBytes(totalSize))\n\n"
+            r += "  " + String(localized: "Total Space:") + " \(Self.formatBytes(disk.totalSpace))\n"
+            r += "  " + String(localized: "Used Space:") + " \(Self.formatBytes(disk.usedSpace)) (\(String(format: "%.1f%%", disk.usedPercentage * 100)))\n"
+            r += "  " + String(localized: "Free Space:") + " \(Self.formatBytes(disk.freeSpace))\n"
+            r += "  " + String(localized: "Purgeable:") + " \(Self.formatBytes(disk.purgeableSpace))\n"
+            r += "  " + String(localized: "Reclaimable:") + " \(Self.formatBytes(overallSize))\n"
+            r += "  " + String(localized: "Selected:") + " \(Self.formatBytes(totalSize))\n\n"
         }
 
         if let summary = lastScanSummary {
-            r += "SCAN SUMMARY\n"
+            r += String(localized: "SCAN SUMMARY") + "\n"
             r += String(repeating: "─", count: 60) + "\n"
-            r += "  Categories:      \(summary.totalCategories)\n"
-            r += "  Total Files:     \(summary.totalFiles)\n"
-            r += "  Total Size:      \(Self.formatBytes(summary.totalSize))\n"
-            r += "  Scan Duration:   \(String(format: "%.2f", summary.scanDuration))s\n"
-            r += "  Scan Time:       \(summary.timestamp.formatted(date: .abbreviated, time: .standard))\n\n"
+            r += "  " + String(localized: "Categories:") + " \(summary.totalCategories)\n"
+            r += "  " + String(localized: "Total Files:") + " \(summary.totalFiles)\n"
+            r += "  " + String(localized: "Total Size:") + " \(Self.formatBytes(summary.totalSize))\n"
+            let duration = summary.scanDuration.formatted(
+                .number.precision(.fractionLength(2))
+            )
+            r += "  " + String(localized: "Scan Duration:") + " "
+                + String(localized: "\(duration) seconds") + "\n"
+            r += "  " + String(localized: "Scan Time:") + " \(summary.timestamp.formatted(date: .abbreviated, time: .standard))\n\n"
         }
 
         r += "═══════════════════════════════════════════════════════════════════\n"
-        r += "DETAILED FINDINGS BY CATEGORY\n"
+        r += String(localized: "DETAILED FINDINGS BY CATEGORY") + "\n"
         r += "═══════════════════════════════════════════════════════════════════\n\n"
 
         for group in CategoryGroup.allCases {
             let groupCats = categoriesForGroup(group)
             guard !groupCats.isEmpty else { continue }
 
-            r += "┌─── \(group.displayName.uppercased()) ─── \(Self.formatBytes(sizeForGroup(group))) total\n"
+            r += "┌─── \(group.displayName.uppercased()) ─── " + String(localized: "\(Self.formatBytes(sizeForGroup(group))) total") + "\n"
             r += "│\n"
 
             for (catIdx, cat) in groupCats.enumerated() {
@@ -4725,46 +4757,49 @@ class CleanupManager {
                 let marker = cat.isSelected ? "✓" : "○"
 
                 r += "\(prefix)── [\(marker)] \(cat.name)\n"
-                r += "\(childPrefix)   Safety:      \(cat.safetyLevel.displayName) — \(cat.safetyLevel.label)\n"
-                r += "\(childPrefix)   Description: \(cat.description)\n"
+                r += "\(childPrefix)   " + String(localized: "Safety:") + " \(cat.safetyLevel.displayName) — \(cat.safetyLevel.label)\n"
+                r += "\(childPrefix)   " + String(localized: "Description:") + " \(cat.description)\n"
                 if let warning = cat.cleanupWarning, !warning.isEmpty {
-                    r += "\(childPrefix)   Warning:     \(warning)\n"
+                    r += "\(childPrefix)   " + String(localized: "Warning:") + " \(warning)\n"
                 }
-                r += "\(childPrefix)   Total Size:  \(Self.formatBytes(cat.size))\n"
-                r += "\(childPrefix)   File Count:  \(cat.fileCount)\n"
-                r += "\(childPrefix)   Selected:    \(cat.isSelected ? "Yes" : "No")\n"
+                r += "\(childPrefix)   " + String(localized: "Total Size:") + " \(Self.formatBytes(cat.size))\n"
+                r += "\(childPrefix)   " + String(localized: "File Count:") + " \(cat.fileCount)\n"
+                r += "\(childPrefix)   " + String(localized: "Selected:") + " \(cat.isSelected ? String(localized: "Yes") : String(localized: "No"))\n"
 
                 if cat.isDockerResource {
-                    r += "\(childPrefix)   Type:        Docker resource (cleaned via Docker CLI)\n"
+                    r += "\(childPrefix)   " + String(localized: "Type: Docker resource (cleaned via Docker CLI)") + "\n"
                     if let cmd = cat.dockerCleanCommand {
-                        r += "\(childPrefix)   Command:     docker \(cmd.joined(separator: " "))\n"
+                        let command = AppLocalization.isolateTechnicalText(
+                            "docker " + cmd.joined(separator: " ")
+                        )
+                        r += "\(childPrefix)   " + String(localized: "Command:") + " \(command)\n"
                     }
                 }
 
                 if cat.isOllamaResource {
-                    r += "\(childPrefix)   Type:        Ollama model (cleaned via `ollama rm`)\n"
+                    r += "\(childPrefix)   " + String(localized: "Type: Ollama model (cleaned via `ollama rm`)") + "\n"
                 }
 
                 if !cat.paths.isEmpty {
-                    r += "\(childPrefix)   Paths:\n"
+                    r += "\(childPrefix)   " + String(localized: "Paths:") + "\n"
                     for path in cat.paths {
-                        r += "\(childPrefix)     → \(path)\n"
+                        r += "\(childPrefix)     → \(AppLocalization.isolateTechnicalText(path))\n"
                     }
                 }
 
                 // Detailed breakdown — ALL entries, not just top 5
                 if !cat.breakdown.isEmpty {
-                    r += "\(childPrefix)   Breakdown (\(cat.breakdown.count) entries):\n"
+                    r += "\(childPrefix)   " + String(localized: "Breakdown (\(cat.breakdown.count) entries):") + "\n"
                     for stat in cat.breakdown {
                         let name = (stat.path as NSString).lastPathComponent
                         let dir = (stat.path as NSString).deletingLastPathComponent
                         r += "\(childPrefix)     ┊ \(Self.formatBytes(stat.size).padding(toLength: 10, withPad: " ", startingAt: 0)) \(name)\n"
                         if verbose {
-                            r += "\(childPrefix)     ┊            Path: \(stat.path)\n"
-                            r += "\(childPrefix)     ┊            Dir:  \(dir)\n"
-                            r += "\(childPrefix)     ┊            Files: \(stat.fileCount)\n"
+                            r += "\(childPrefix)     ┊ " + String(localized: "Path:") + " \(AppLocalization.isolateTechnicalText(stat.path))\n"
+                            r += "\(childPrefix)     ┊ " + String(localized: "Directory:") + " \(AppLocalization.isolateTechnicalText(dir))\n"
+                            r += "\(childPrefix)     ┊ " + String(localized: "Files:") + " \(stat.fileCount)\n"
                             if let accessed = stat.lastAccessed {
-                                r += "\(childPrefix)     ┊            Last Accessed: \(accessed.formatted(date: .abbreviated, time: .standard))\n"
+                                r += "\(childPrefix)     ┊ " + String(localized: "Last Accessed:") + " \(accessed.formatted(date: .abbreviated, time: .standard))\n"
                             }
                         }
                     }
@@ -4777,7 +4812,7 @@ class CleanupManager {
 
         // Safety summary
         r += "═══════════════════════════════════════════════════════════════════\n"
-        r += "SAFETY AUDIT SUMMARY\n"
+        r += String(localized: "SAFETY AUDIT SUMMARY") + "\n"
         r += "═══════════════════════════════════════════════════════════════════\n\n"
 
         let safeCats = categories.filter { $0.safetyLevel == .safe }
@@ -4788,26 +4823,26 @@ class CleanupManager {
         let reviewSize = reviewCats.reduce(0 as Int64) { $0 + $1.size }
         let cautionSize = cautionCats.reduce(0 as Int64) { $0 + $1.size }
 
-        r += "  ✓ SAFE (\(safeCats.count) categories, \(Self.formatBytes(safeSize))):\n"
-        r += "    Regenerable caches, reviewed temporary files, and logs. Trash-first recovery still depends on the item remaining in Trash.\n"
+        r += "  ✓ " + String(localized: "SAFE (\(safeCats.count) categories, \(Self.formatBytes(safeSize))):") + "\n"
+        r += "    " + String(localized: "Regenerable caches, reviewed temporary files, and logs. Trash-first recovery still depends on the item remaining in Trash.") + "\n"
         for cat in safeCats {
             r += "    • \(cat.name): \(Self.formatBytes(cat.size))\n"
         }
 
-        r += "\n  ⚠ REVIEW (\(reviewCats.count) categories, \(Self.formatBytes(reviewSize))):\n"
-        r += "    User files that may be wanted — review before deleting.\n"
+        r += "\n  ⚠ " + String(localized: "REVIEW (\(reviewCats.count) categories, \(Self.formatBytes(reviewSize))):") + "\n"
+        r += "    " + String(localized: "User files that may be wanted — review before deleting.") + "\n"
         for cat in reviewCats {
             r += "    • \(cat.name): \(Self.formatBytes(cat.size))\n"
         }
 
-        r += "\n  ✕ CAUTION (\(cautionCats.count) categories, \(Self.formatBytes(cautionSize))):\n"
-        r += "    App data or system files — could cause issues if deleted.\n"
+        r += "\n  ✕ " + String(localized: "CAUTION (\(cautionCats.count) categories, \(Self.formatBytes(cautionSize))):") + "\n"
+        r += "    " + String(localized: "App data or system files — could cause issues if deleted.") + "\n"
         for cat in cautionCats {
             r += "    • \(cat.name): \(Self.formatBytes(cat.size))\n"
         }
 
         r += "\n═══════════════════════════════════════════════════════════════════\n"
-        r += "END OF REPORT\n"
+        r += String(localized: "END OF REPORT") + "\n"
         r += "═══════════════════════════════════════════════════════════════════\n"
 
         return r

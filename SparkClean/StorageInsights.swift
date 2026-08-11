@@ -23,6 +23,19 @@ struct InsightItem: Identifiable {
     var accessible: Bool = true // false when a path exists but is unreadable (needs FDA)
     var measurementIncomplete = false
 
+    init(
+        id: String,
+        name: String.LocalizationValue,
+        icon: String,
+        templatePaths: [String]
+    ) {
+        self.id = id
+        self.name = String(localized: name)
+        self.icon = icon
+        self.templatePaths = templatePaths
+        self.previousSize = nil
+    }
+
     var delta: Int64? {
         guard let prev = previousSize else { return nil }
         return size - prev

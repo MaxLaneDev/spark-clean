@@ -113,7 +113,7 @@ class DuplicateFinderManager {
         scanProgress = 0
         scanWasPartial = false
         cancelRequested = false
-        currentScanItem = "Preparing scan..."
+        currentScanItem = String(localized: "Preparing scan...")
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
@@ -123,7 +123,7 @@ class DuplicateFinderManager {
 
             // Phase 1: Group files by size
             DispatchQueue.main.async {
-                self.currentScanItem = "Grouping files by size..."
+                self.currentScanItem = String(localized: "Grouping files by size...")
                 self.scanProgress = 0.05
             }
 
@@ -141,7 +141,7 @@ class DuplicateFinderManager {
                 if self.cancelRequested || hitWatchdog { break }
                 let dirName = (dir as NSString).lastPathComponent
                 DispatchQueue.main.async {
-                    self.currentScanItem = "Scanning \(dirName)..."
+                    self.currentScanItem = String(localized: "Scanning \(dirName)...")
                     self.scanProgress = 0.05 + Double(dirIndex) / Double(dirs.count) * 0.30
                 }
 
@@ -200,7 +200,7 @@ class DuplicateFinderManager {
             sizeGroups = sizeGroups.filter { $0.value.count > 1 }
 
             DispatchQueue.main.async {
-                self.currentScanItem = "Comparing file headers..."
+                self.currentScanItem = String(localized: "Comparing file headers...")
                 self.scanProgress = 0.40
             }
 
@@ -218,7 +218,7 @@ class DuplicateFinderManager {
                     let progress = 0.40 + Double(groupIndex) / Double(max(groupCount, 1)) * 0.55
                     DispatchQueue.main.async {
                         self.scanProgress = min(progress, 0.95)
-                        self.currentScanItem = "Comparing candidates (\(groupIndex)/\(groupCount))..."
+                        self.currentScanItem = String(localized: "Comparing candidates (\(groupIndex)/\(groupCount))...")
                     }
                 }
 
@@ -282,7 +282,7 @@ class DuplicateFinderManager {
             // Phase 3: Find visually similar images
             if !self.cancelRequested && !hitWatchdog {
                 DispatchQueue.main.async {
-                    self.currentScanItem = "Scanning for similar images..."
+                    self.currentScanItem = String(localized: "Scanning for similar images...")
                     self.scanProgress = 0.70
                 }
                 let similarImages = self.scanSimilarImages(existingDupPaths: exactDupPaths)
@@ -304,10 +304,10 @@ class DuplicateFinderManager {
             DispatchQueue.main.async {
                 self.duplicateGroups = results
                 self.totalWastedSpace = totalWasted
-                self.scanStats = "Scanned \(totalFilesScanned) files (\(totalImagesScanned) images)" +
+                self.scanStats = String(localized: "Scanned \(totalFilesScanned) files (\(totalImagesScanned) images)") +
                     (wasCancelled
-                        ? " · cancelled, partial results"
-                        : (hitWatchdog ? " · safety limit reached, partial results" : ""))
+                        ? String(localized: " · cancelled, partial results")
+                        : (hitWatchdog ? String(localized: " · safety limit reached, partial results") : ""))
                 self.scanWasPartial = wasPartial
                 self.isScanning = false
                 self.scanComplete = true
@@ -602,7 +602,7 @@ class DuplicateFinderManager {
                     let progress = 0.70 + Double(idx) / Double(imageFiles.count) * 0.25
                     DispatchQueue.main.async {
                         self.scanProgress = min(progress, 0.95)
-                        self.currentScanItem = "Analyzing images (\(idx)/\(imageFiles.count))..."
+                        self.currentScanItem = String(localized: "Analyzing images (\(idx)/\(imageFiles.count))...")
                     }
                 }
                 if let hash = Self.perceptualHash(ofImage: file.path) {
@@ -689,17 +689,15 @@ struct DuplicateFinderView: View {
                     let failures = await manager.cleanSelected()
                     isCleaning = false
                     if failures > 0 {
-                        cleanFailureMessage = "\(failures) duplicate item(s) could not be moved to Trash. The affected groups remain in the list."
+                        cleanFailureMessage = String(localized: "\(failures) duplicate item(s) could not be moved to Trash. The affected groups remain in the list.")
                     }
                 }
             }
         } message: {
-            Text(
-                "This keeps the first copy of each selected group and moves the others (\(CleanupManager.formatBytes(manager.selectedWastedSpace))) to Trash." +
-                (manager.selectedSimilarCount > 0
-                    ? "\n\n\(manager.selectedSimilarCount) selected group(s) are visual matches, not byte-identical files. Review every path before continuing."
-                    : "")
-            )
+            let similarWarning = manager.selectedSimilarCount > 0
+                ? String(localized: "\n\n\(manager.selectedSimilarCount) selected group(s) are visual matches, not byte-identical files. Review every path before continuing.")
+                : ""
+            Text(String(localized: "This keeps the first copy of each selected group and moves the others (\(CleanupManager.formatBytes(manager.selectedWastedSpace))) to Trash.\(similarWarning)"))
         }
         .alert("Some Duplicates Were Not Removed", isPresented: Binding(
             get: { cleanFailureMessage != nil },
@@ -748,7 +746,11 @@ struct DuplicateFinderView: View {
                 HStack(spacing: 6) {
                     Image(systemName: manager.isScanning ? "xmark" : "arrow.clockwise")
                         .font(.system(size: 12, weight: .semibold))
-                    Text(manager.isScanning ? "Cancel" : (manager.scanComplete ? "Rescan" : "Scan"))
+                    Text(
+                        manager.isScanning
+                            ? String(localized: "Cancel")
+                            : (manager.scanComplete ? String(localized: "Rescan") : String(localized: "Scan"))
+                    )
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .padding(.horizontal, 14)
@@ -832,16 +834,16 @@ struct DuplicateFinderView: View {
                 .foregroundStyle(manager.scanWasPartial ? .orange : .green)
             Text(
                 manager.searchQuery.isEmpty
-                    ? (manager.scanWasPartial ? "Partial Scan Completed" : "No Duplicates Found")
-                    : "No Matches"
+                    ? (manager.scanWasPartial ? String(localized: "Partial Scan Completed") : String(localized: "No Duplicates Found"))
+                    : String(localized: "No Matches")
             )
                 .font(.title3)
                 .fontWeight(.semibold)
             Text(manager.searchQuery.isEmpty
                  ? (manager.scanWasPartial
-                    ? "No duplicates were found in the files processed. Rescan to complete the remaining folders.\n\(manager.scanStats)"
-                    : "Your files look clean — no duplicate files were detected.\n\(manager.scanStats)")
-                 : "No duplicate groups match your search.")
+                    ? String(localized: "No duplicates were found in the files processed. Rescan to complete the remaining folders.\n\(manager.scanStats)")
+                    : String(localized: "Your files look clean — no duplicate files were detected.\n\(manager.scanStats)"))
+                 : String(localized: "No duplicate groups match your search."))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -884,7 +886,11 @@ struct DuplicateFinderView: View {
     private var bottomBar: some View {
         HStack(spacing: 16) {
             if manager.selectedCount > 0 {
-                Text("\(manager.selectedCount) group\(manager.selectedCount == 1 ? "" : "s") selected, \(CleanupManager.formatBytes(manager.selectedWastedSpace)) wasted")
+                Text(
+                    manager.selectedCount == 1
+                        ? String(localized: "1 group selected, \(CleanupManager.formatBytes(manager.selectedWastedSpace)) wasted")
+                        : String(localized: "\(manager.selectedCount) groups selected, \(CleanupManager.formatBytes(manager.selectedWastedSpace)) wasted")
+                )
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
             } else {
@@ -946,7 +952,7 @@ struct DuplicateGroupRow: View {
 
                 // Expand/collapse
                 Button(action: onToggleExpand) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 16)
@@ -977,7 +983,11 @@ struct DuplicateGroupRow: View {
                                 .foregroundStyle(.teal)
                         }
                     }
-                    Text("\(group.paths.count) copies\(group.isSimilarImage ? " (visually identical)" : "")")
+                    Text(
+                        group.isSimilarImage
+                            ? String(localized: "\(group.paths.count) copies (visually identical)")
+                            : String(localized: "\(group.paths.count) copies")
+                    )
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -990,7 +1000,7 @@ struct DuplicateGroupRow: View {
                     .foregroundStyle(.secondary)
 
                 // Wasted space
-                Text("+" + CleanupManager.formatBytes(group.wastedSize) + " wasted")
+                Text(String(localized: "+\(CleanupManager.formatBytes(group.wastedSize)) wasted"))
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(group.wastedSize > 100_000_000 ? .red : .orange)
             }
@@ -1030,6 +1040,7 @@ struct DuplicateGroupRow: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
+                                .technicalTextDirection()
 
                             Spacer()
 

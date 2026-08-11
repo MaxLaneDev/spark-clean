@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "SparkClean";
+"NSAppleEventsUsageDescription" = "SparkClean משתמשת באירועי Apple רק לאחר אישורך לפעולת ניקוי או תחזוקה הדורשת הרשאות מנהל מערכת.";
+"NSDesktopFolderUsageDescription" = "SparkClean סורקת את שולחן העבודה לאיתור צילומי מסך ישנים כדי לסייע בפינוי שטח אחסון.";
+"NSDocumentsFolderUsageDescription" = "SparkClean סורקת את תיקיית המסמכים לאיתור צילומי מסך ישנים כדי לסייע בפינוי שטח אחסון.";
+"NSDownloadsFolderUsageDescription" = "SparkClean סורקת את תיקיית ההורדות לאיתור קבצים וקובצי התקנה ישנים כדי לסייע בפינוי שטח אחסון.";
+"NSSystemAdministrationUsageDescription" = "SparkClean מבקשת אישור מנהל מערכת רק עבור פעולות ניקוי או תחזוקה שאישרת במפורש.";

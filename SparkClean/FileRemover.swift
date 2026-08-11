@@ -21,6 +21,8 @@ import Darwin
 
 final class FileRemover {
 
+    static let itemNoLongerExistsError = String(localized: "Item no longer exists")
+
     /// Stable filesystem identity captured at scan/review time. Device + inode catches
     /// a different item being swapped into the same path before cleanup.
     nonisolated struct FileIdentity: Hashable, Sendable {
@@ -126,31 +128,33 @@ final class FileRemover {
 
         // Gate 1: global safety rules + category territory.
         guard policy.validate(path, allowedRoots: allowedRoots) else {
-            return .blocked(reason: "outside the permitted cleanup area")
+            return .blocked(reason: String(localized: "outside the permitted cleanup area"))
         }
 
         // Gate 2: delete-time revalidation. A scan result can be minutes old, so do
         // not trust that the path still exists or has the same kind.
         guard let isDirectory = existingItemIsDirectory(at: path) else {
-            return .failed(error: "Item no longer exists")
+            return .failed(error: Self.itemNoLongerExistsError)
         }
         if let expectedIsDirectory, expectedIsDirectory != isDirectory {
-            return .blocked(reason: "item type changed since it was scanned")
+            return .blocked(reason: String(localized: "item type changed since it was scanned"))
         }
         if let expectedIdentity, Self.fileIdentity(at: path) != expectedIdentity {
-            return .blocked(reason: "a different item replaced the scanned path")
+            return .blocked(reason: String(localized: "a different item replaced the scanned path"))
         }
         guard let currentIdentity = Self.fileIdentity(at: path) else {
-            return .failed(error: "Could not verify the item's filesystem identity")
+            return .failed(error: String(localized: "Could not verify the item's filesystem identity"))
         }
         guard trustedDeviceIDs.contains(currentIdentity.device) else {
-            return .blocked(reason: "items on mounted or external volumes are protected")
+            return .blocked(reason: String(localized: "items on mounted or external volumes are protected"))
         }
 
         // Gate 3: never delete a mounted volume or an iCloud/file-provider item.
         if let rv = try? url.resourceValues(forKeys: [.isUbiquitousItemKey, .isVolumeKey]) {
             if rv.isUbiquitousItem == true { return .skippedICloud }
-            if rv.isVolume == true { return .blocked(reason: "mounted volumes cannot be removed") }
+            if rv.isVolume == true {
+                return .blocked(reason: String(localized: "mounted volumes cannot be removed"))
+            }
         }
 
         let size = knownSize ?? itemSize(at: path)
@@ -191,7 +195,10 @@ final class FileRemover {
             policy.validate($0.path, allowedRoots: $0.allowedRoots)
         }
         guard !initiallyValid.isEmpty else {
-            return AdminResult(failures: requests.map { "\($0.path): blocked by deletion policy" })
+            return AdminResult(failures: requests.map {
+                let path = AppLocalization.isolateTechnicalText($0.path)
+                return String(localized: "\(path): blocked by deletion policy")
+            })
         }
         guard confirmAdministratorMove(
             paths: initiallyValid.map(\.path),
@@ -208,7 +215,8 @@ final class FileRemover {
             case nil:
                 valid.append(request)
             case .some(let message):
-                result.failures.append("\(request.path): \(message)")
+                let path = AppLocalization.isolateTechnicalText(request.path)
+                result.failures.append(String(localized: "\(path): \(message)"))
             }
         }
         guard !valid.isEmpty else { return result }
@@ -221,14 +229,16 @@ final class FileRemover {
         ] = []
         for request in valid {
             guard let identity = Self.fileIdentity(at: request.path) else {
+                let path = AppLocalization.isolateTechnicalText(request.path)
                 result.failures.append(
-                    "\(request.path): could not verify filesystem identity"
+                    String(localized: "\(path): could not verify filesystem identity")
                 )
                 continue
             }
             if let expected = request.expectedIdentity, identity != expected {
+                let path = AppLocalization.isolateTechnicalText(request.path)
                 result.failures.append(
-                    "\(request.path): a different item replaced the reviewed path"
+                    String(localized: "\(path): a different item replaced the reviewed path")
                 )
                 continue
             }
@@ -261,7 +271,7 @@ final class FileRemover {
             try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptURL.path)
         } catch {
             try? fm.removeItem(at: privateDirectory)
-            result.failures.append("Could not prepare the private administrator helper: \(error.localizedDescription)")
+            result.failures.append(String(localized: "Could not prepare the private administrator helper: \(error.localizedDescription)"))
             return result
         }
         defer { try? fm.removeItem(at: privateDirectory) }
@@ -297,13 +307,14 @@ final class FileRemover {
                     fileIdentity: move.identity
                 ))
             } else {
-                result.failures.append("\(move.request.path): administrator move failed")
+                let path = AppLocalization.isolateTechnicalText(move.request.path)
+                result.failures.append(String(localized: "\(path): administrator move failed"))
             }
         }
 
         if let scriptError, result.removals.isEmpty {
             let message = scriptError["NSAppleScriptErrorMessage"] as? String
-                ?? "Administrator authorization was cancelled or failed"
+                ?? String(localized: "Administrator authorization was cancelled or failed")
             result.failures.append(message)
         }
         return result
@@ -311,26 +322,30 @@ final class FileRemover {
 
     private func validateForAdministratorMove(_ request: AdminRequest) -> String? {
         guard policy.validate(request.path, allowedRoots: request.allowedRoots) else {
-            return "blocked by deletion policy"
+            return String(localized: "blocked by deletion policy")
         }
         guard let isDirectory = existingItemIsDirectory(at: request.path) else {
-            return "item no longer exists"
+            return String(localized: "item no longer exists")
         }
         if let expected = request.expectedIsDirectory, expected != isDirectory {
-            return "item type changed since it was scanned"
+            return String(localized: "item type changed since it was scanned")
         }
         if let expected = request.expectedIdentity,
            Self.fileIdentity(at: request.path) != expected {
-            return "a different item replaced the scanned path"
+            return String(localized: "a different item replaced the scanned path")
         }
         guard let identity = Self.fileIdentity(at: request.path),
               trustedDeviceIDs.contains(identity.device) else {
-            return "items on mounted or external volumes are protected"
+            return String(localized: "items on mounted or external volumes are protected")
         }
         let url = URL(fileURLWithPath: request.path)
         if let rv = try? url.resourceValues(forKeys: [.isUbiquitousItemKey, .isVolumeKey]) {
-            if rv.isUbiquitousItem == true { return "iCloud/file-provider items are protected" }
-            if rv.isVolume == true { return "mounted volumes cannot be removed" }
+            if rv.isUbiquitousItem == true {
+                return String(localized: "iCloud/file-provider items are protected")
+            }
+            if rv.isVolume == true {
+                return String(localized: "mounted volumes cannot be removed")
+            }
         }
         return nil
     }
@@ -355,10 +370,10 @@ final class FileRemover {
         runOnMain {
             let alert = NSAlert()
             alert.messageText = title
-            alert.informativeText = "\(paths.count) item(s) need administrator privileges. Review every path before continuing."
+            alert.informativeText = String(localized: "\(paths.count) item(s) need administrator privileges. Review every path before continuing.")
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "Move to Trash")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: String(localized: "Move to Trash"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
 
             let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 560, height: 180))
             scrollView.hasVerticalScroller = true
@@ -367,7 +382,9 @@ final class FileRemover {
             textView.isEditable = false
             textView.isSelectable = true
             textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-            textView.string = paths.joined(separator: "\n")
+            textView.string = paths
+                .map { "\u{2066}\($0)\u{2069}" }
+                .joined(separator: "\n")
             scrollView.documentView = textView
             alert.accessoryView = scrollView
 

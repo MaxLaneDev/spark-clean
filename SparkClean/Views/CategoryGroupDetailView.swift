@@ -276,9 +276,12 @@ struct CategoryRowView: View {
 
     private func safetyTooltip(_ level: SafetyLevel) -> String {
         switch level {
-        case .safe: "Low-risk cleanup — caches, logs, and generated files that are expected to rebuild automatically."
-        case .review: "Review before deleting — user files that may be wanted. Check the contents first."
-        case .caution: "Use caution — app data or system files that could affect running applications."
+        case .safe:
+            String(localized: "Low-risk cleanup — caches, logs, and generated files that are expected to rebuild automatically.")
+        case .review:
+            String(localized: "Review before deleting — user files that may be wanted. Check the contents first.")
+        case .caution:
+            String(localized: "Use caution — app data or system files that could affect running applications.")
         }
     }
 }
@@ -372,17 +375,32 @@ struct PathBreakdownView: View {
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     if category.isOllamaResource || category.isDockerResource {
-                                        Text(stat.path)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .lineLimit(1)
+                                        if let displayName = stat.displayName {
+                                            Text(displayName)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .lineLimit(1)
+                                        } else {
+                                            Text(stat.path)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .lineLimit(1)
+                                                .technicalTextDirection()
+                                        }
                                     } else {
-                                        Text(stat.displayName ?? (stat.path as NSString).lastPathComponent)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .lineLimit(1)
+                                        if let displayName = stat.displayName {
+                                            Text(displayName)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .lineLimit(1)
+                                        } else {
+                                            Text((stat.path as NSString).lastPathComponent)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .lineLimit(1)
+                                                .technicalTextDirection()
+                                        }
                                         Text((stat.path as NSString).deletingLastPathComponent)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                             .lineLimit(1)
+                                            .technicalTextDirection()
                                     }
                                 }
                                 Spacer()
@@ -390,7 +408,11 @@ struct PathBreakdownView: View {
                                     Text(CleanupManager.formatBytes(stat.size))
                                         .font(.system(size: 12, weight: .semibold))
                                     if stat.fileCount > 0 {
-                                        Text("\(stat.fileCount) file\(stat.fileCount == 1 ? "" : "s")")
+                                        Text(
+                                            stat.fileCount == 1
+                                                ? String(localized: "1 file")
+                                                : String(localized: "\(stat.fileCount) files")
+                                        )
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
@@ -438,12 +460,14 @@ struct PathBreakdownView: View {
                                     HStack(spacing: 8) {
                                         Spacer().frame(width: 28)
                                         Image(systemName: "arrow.turn.down.right")
+                                            .flipsForRightToLeftLayoutDirection(true)
                                             .font(.caption2)
                                             .foregroundStyle(.tertiary)
                                         Text(child.path)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                             .lineLimit(1)
+                                            .technicalTextDirection()
                                         Spacer()
                                         Text(CleanupManager.formatBytes(child.size))
                                             .font(.caption2)

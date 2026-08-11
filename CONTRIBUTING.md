@@ -38,14 +38,17 @@ To contribute a language:
 
 1. Open `SparkClean.xcodeproj` in Xcode.
 2. Select `Localizable.xcstrings`, choose **Editor → Add Language**, and select the language.
-3. Translate user-facing entries without changing file paths, bundle identifiers,
-   command names, or audit-log text.
+3. Translate user-facing entries without changing placeholders such as `%1$@` or
+   `%2$lld`. Keep file paths, bundle identifiers, command names, and URLs in their
+   original left-to-right form.
 4. Run the app with that language and check the sidebar, confirmation sheets, and
-   Settings at the minimum window size.
+   Settings at the minimum window size. For a right-to-left language, also verify
+   navigation order, directional icons, and technical text.
 5. Submit one language per pull request so native speakers can review it independently.
 
-The source language is English. Priority community translations are Spanish, German,
-French, Japanese, Simplified Chinese, and Portuguese.
+The source language is English. Simplified Chinese, Japanese, German, and Hebrew are
+included. Priority community translations are Spanish, French, Portuguese, Korean,
+Italian, and Traditional Chinese.
 
 ## Reporting Bugs
 

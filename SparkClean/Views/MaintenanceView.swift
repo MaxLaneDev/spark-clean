@@ -20,6 +20,24 @@ struct MaintenanceTask: Identifiable {
     let command: () -> (Bool, String)
     var estimate: String? = nil
 
+    init(
+        name: String.LocalizationValue,
+        description: String.LocalizationValue,
+        icon: String,
+        iconColor: Color,
+        requiresAdmin: Bool,
+        warning: String.LocalizationValue?,
+        command: @escaping () -> (Bool, String)
+    ) {
+        self.name = String(localized: name)
+        self.description = String(localized: description)
+        self.icon = icon
+        self.iconColor = iconColor
+        self.requiresAdmin = requiresAdmin
+        self.warning = warning.map { String(localized: $0) }
+        self.command = command
+    }
+
     enum Status: Equatable {
         case idle
         case running
@@ -75,8 +93,10 @@ class MaintenanceManager {
                 icon: "network", iconColor: .blue, requiresAdmin: false, warning: nil,
                 command: {
                     let r1 = CleanupManager.runCommand("/usr/bin/dscacheutil", arguments: ["-flushcache"])
-                    guard let r1 else { return (false, "Could not flush the DNS cache") }
-                    return (true, r1.isEmpty ? "DNS cache flushed" : r1)
+                    guard let r1 else {
+                        return (false, String(localized: "Could not flush the DNS cache"))
+                    }
+                    return (true, r1.isEmpty ? String(localized: "DNS cache flushed") : r1)
                 }
             ), status: .idle, isSelected: false),
 
@@ -86,7 +106,7 @@ class MaintenanceManager {
                 icon: "eye.square", iconColor: .purple, requiresAdmin: false, warning: nil,
                 command: {
                     let r = CleanupManager.runCommand("/usr/bin/qlmanage", arguments: ["-r", "cache"])
-                    return (r != nil, r ?? "QuickLook cache reset")
+                    return (r != nil, r ?? String(localized: "QuickLook cache reset"))
                 }
             ), status: .idle, isSelected: false),
 
@@ -97,7 +117,7 @@ class MaintenanceManager {
                 command: {
                     let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
                     guard CleanupManager.runCommand(lsregister, arguments: ["-gc"]) != nil else {
-                        return (false, "Could not compact Launch Services")
+                        return (false, String(localized: "Could not compact Launch Services"))
                     }
                     let restarted = CleanupManager.runCommand(
                         "/usr/bin/killall",
@@ -106,8 +126,8 @@ class MaintenanceManager {
                     return (
                         restarted,
                         restarted
-                            ? "Launch Services compacted, Finder restarted"
-                            : "Launch Services compacted, but Finder could not be restarted"
+                            ? String(localized: "Launch Services compacted, Finder restarted")
+                            : String(localized: "Launch Services compacted, but Finder could not be restarted")
                     )
                 }
             ), status: .idle, isSelected: false),
@@ -119,7 +139,7 @@ class MaintenanceManager {
                 warning: "You may need to log out and back in for fonts to reload.",
                 command: {
                     let r = CleanupManager.runCommand("/usr/bin/atsutil", arguments: ["databases", "-removeUser"])
-                    return (r != nil, r ?? "User font cache cleared")
+                    return (r != nil, r ?? String(localized: "User font cache cleared"))
                 }
             ), status: .idle, isSelected: false),
 
@@ -133,9 +153,9 @@ class MaintenanceManager {
                     var error: NSDictionary?
                     NSAppleScript(source: script)?.executeAndReturnError(&error)
                     if let error {
-                        return (false, error["NSAppleScriptErrorMessage"] as? String ?? "Failed")
+                        return (false, error["NSAppleScriptErrorMessage"] as? String ?? String(localized: "Failed"))
                     }
-                    return (true, "mDNSResponder restarted")
+                    return (true, String(localized: "mDNSResponder restarted"))
                 }
             ), status: .idle, isSelected: false),
 
@@ -149,9 +169,9 @@ class MaintenanceManager {
                     var error: NSDictionary?
                     NSAppleScript(source: script)?.executeAndReturnError(&error)
                     if let error {
-                        return (false, error["NSAppleScriptErrorMessage"] as? String ?? "Failed")
+                        return (false, error["NSAppleScriptErrorMessage"] as? String ?? String(localized: "Failed"))
                     }
-                    return (true, "Spotlight reindex started — will complete in the background")
+                    return (true, String(localized: "Spotlight reindex started — will complete in the background"))
                 }
             ), status: .idle, isSelected: false),
 
@@ -162,7 +182,7 @@ class MaintenanceManager {
                 warning: "This changes an APFS container setting. It does not guarantee immediate free space.",
                 command: { [weak self] in
                     guard let diskID = self?.containerDisk else {
-                        return (false, "Could not safely determine the APFS container identifier.")
+                        return (false, String(localized: "Could not safely determine the APFS container identifier."))
                     }
 
                     // Check current status first
@@ -177,16 +197,16 @@ class MaintenanceManager {
                         ) != nil
 
                     if alreadyEnabled {
-                        return (true, "APFS defragmentation is already enabled and running in the background")
+                        return (true, String(localized: "APFS defragmentation is already enabled and running in the background"))
                     }
 
                     let script = "do shell script \"/usr/sbin/diskutil apfs defragment \(diskID) enable\" with administrator privileges"
                     var error: NSDictionary?
                     NSAppleScript(source: script)?.executeAndReturnError(&error)
                     if let error {
-                        return (false, error["NSAppleScriptErrorMessage"] as? String ?? "Failed — admin password required")
+                        return (false, error["NSAppleScriptErrorMessage"] as? String ?? String(localized: "Failed — admin password required"))
                     }
-                    return (true, "APFS defragmentation enabled — macOS will compact eligible files in the background")
+                    return (true, String(localized: "APFS defragmentation enabled — macOS will compact eligible files in the background"))
                 }
             ), status: .idle, isSelected: false),
         ]
@@ -320,7 +340,10 @@ struct MaintenanceView: View {
                             }
                         }
                     } header: {
-                        sectionHeader("Quick Actions", subtitle: "No admin password required")
+                        sectionHeader(
+                            String(localized: "Quick Actions"),
+                            subtitle: String(localized: "No admin password required")
+                        )
                     }
 
                     Section {
@@ -335,7 +358,10 @@ struct MaintenanceView: View {
                             }
                         }
                     } header: {
-                        sectionHeader("Admin Actions", subtitle: "Requires your password")
+                        sectionHeader(
+                            String(localized: "Admin Actions"),
+                            subtitle: String(localized: "Requires your password")
+                        )
                     }
 
                 }
@@ -344,14 +370,22 @@ struct MaintenanceView: View {
         }
         .alert("Run Maintenance Tasks?", isPresented: $showRunConfirmation) {
             Button("Cancel", role: .cancel) {}
-            Button("Run \(manager.selectedCount) Task\(manager.selectedCount == 1 ? "" : "s")", role: .destructive) {
+            Button(
+                manager.selectedCount == 1
+                    ? String(localized: "Run 1 Task")
+                    : String(localized: "Run \(manager.selectedCount) Tasks"),
+                role: .destructive
+            ) {
                 manager.runSelected()
             }
         } message: {
             let selected = manager.tasks.filter(\.isSelected)
             let names = selected.map(\.task.name).joined(separator: ", ")
             let hasAdmin = selected.contains(where: \.task.requiresAdmin)
-            Text("\(names)\(hasAdmin ? "\n\nSome tasks require your admin password." : "")")
+            let adminNote = hasAdmin
+                ? String(localized: "\n\nSome tasks require your admin password.")
+                : ""
+            Text(names + adminNote)
         }
     }
 

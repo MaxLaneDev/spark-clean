@@ -80,7 +80,7 @@ final class UpdateChecker {
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Could not verify the latest GitHub release. Check your connection and try again."
+                errorMessage = String(localized: "Could not verify the latest GitHub release. Check your connection and try again.")
                 isChecking = false
                 checkCompleted = true
             }
@@ -111,7 +111,7 @@ final class UpdateChecker {
                       Self.isAllowedGitHubAssetURL(response.url),
                       Self.isValidUDIFDiskImage(at: tempURL)
                 else {
-                    self?.errorMessage = "Download failed. Please try again."
+                    self?.errorMessage = String(localized: "Download failed. Please try again.")
                     return
                 }
 
@@ -133,7 +133,7 @@ final class UpdateChecker {
                     }
                     NSWorkspace.shared.activateFileViewerSelecting([saveURL])
                 } catch {
-                    self?.errorMessage = "Could not save the file."
+                    self?.errorMessage = String(localized: "Could not save the file.")
                 }
             }
         }
@@ -242,6 +242,9 @@ struct SettingsView: View {
     @AppStorage("trashMonitorEnabled") private var trashMonitorEnabled = false
     @AppStorage("checkUpdatesOnLaunch") private var checkUpdatesOnLaunch = false
     @AppStorage("showMenuBarExtra") private var showMenuBarExtra = false
+    @State private var selectedLanguage = AppLocalization.selectedLanguage
+    @State private var languageChangeNeedsRestart = false
+    @State private var languageSaveFailed = false
 
     // Large Files settings
     @AppStorage("largeFileScanDownloads") private var largeFileScanDownloads = true
@@ -287,12 +290,59 @@ struct SettingsView: View {
                 }
         }
         .frame(width: 500, height: 560)
+        .alert("Language Change Failed", isPresented: $languageSaveFailed) {
+            Button("OK") {}
+        } message: {
+            Text("SparkClean could not save your language preference.")
+        }
     }
 
     // MARK: General
 
     private var generalTab: some View {
         Form {
+            Section {
+                HStack {
+                    Label("App Language", systemImage: "globe")
+
+                    Spacer()
+
+                    Picker("App Language", selection: $selectedLanguage) {
+                        Text("System Default").tag(AppLanguage.system)
+                        Text(verbatim: "English").tag(AppLanguage.english)
+                        Text(verbatim: "简体中文").tag(AppLanguage.simplifiedChinese)
+                        Text(verbatim: "日本語").tag(AppLanguage.japanese)
+                        Text(verbatim: "Deutsch").tag(AppLanguage.german)
+                        Text(verbatim: "עברית").tag(AppLanguage.hebrew)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 180)
+                    .onChange(of: selectedLanguage) { oldValue, newValue in
+                        guard oldValue != newValue else { return }
+                        if AppLocalization.selectLanguage(newValue) {
+                            languageChangeNeedsRestart = true
+                        } else {
+                            languageSaveFailed = true
+                        }
+                    }
+                }
+
+                if languageChangeNeedsRestart {
+                    HStack {
+                        Spacer()
+                        Button("Restart SparkClean") {
+                            AppLocalization.restartApplication()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+            } header: {
+                Text("Language")
+            } footer: {
+                Text("System Default follows your Mac language. Changes take effect after restarting SparkClean.")
+            }
+
             Section("Startup") {
                 Toggle("Show intro video on launch", isOn: $showIntroVideo)
                 Toggle("Check for updates on launch", isOn: $checkUpdatesOnLaunch)

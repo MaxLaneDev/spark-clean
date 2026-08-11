@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "SparkClean";
+"NSAppleEventsUsageDescription" = "SparkClean verwendet Apple Events nur, wenn du eine Bereinigungs- oder Wartungsaktion mit Administratorrechten bestätigst.";
+"NSDesktopFolderUsageDescription" = "SparkClean durchsucht deinen Schreibtisch nach alten Bildschirmfotos, um Speicherplatz freizugeben.";
+"NSDocumentsFolderUsageDescription" = "SparkClean durchsucht deinen Dokumente-Ordner nach alten Bildschirmfotos, um Speicherplatz freizugeben.";
+"NSDownloadsFolderUsageDescription" = "SparkClean durchsucht deinen Downloads-Ordner nach alten Dateien und Installationsprogrammen, um Speicherplatz freizugeben.";
+"NSSystemAdministrationUsageDescription" = "SparkClean fordert Administratorrechte nur für Bereinigungs- oder Wartungsaktionen an, die du ausdrücklich bestätigst.";

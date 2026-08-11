@@ -5,6 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 ## [Unreleased]
 
 ### Added
+- **localization**: Complete Simplified Chinese, Japanese, German, and Hebrew translations; Hebrew uses a native right-to-left layout with left-to-right handling for paths and other technical text. Added an in-app language selector with one-click restart and catalog coverage tests (#2).
 
 ### Changed
 

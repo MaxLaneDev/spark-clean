@@ -284,7 +284,7 @@ final class TrashMonitor {
     private func sendNotification(appName: String, size: Int64) {
         let content = UNMutableNotificationContent()
         content.title = "SparkClean"
-        content.body = "\(appName) left \(CleanupManager.formatBytes(size)) of data behind. Open SparkClean to clean up."
+        content.body = String(localized: "\(appName) left \(CleanupManager.formatBytes(size)) of data behind. Open SparkClean to clean up.")
         content.sound = .default
 
         let request = UNNotificationRequest(

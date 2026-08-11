@@ -26,7 +26,15 @@ struct APFSVolumeUsage: Identifiable, Codable, Sendable {
     let usedSpace: Int64
 
     var displayRole: String {
-        roles.first ?? name
+        guard let role = roles.first else { return name }
+        switch role {
+        case "Data": return String(localized: "Data")
+        case "System": return String(localized: "System")
+        case "Preboot": return String(localized: "Preboot")
+        case "Recovery": return String(localized: "Recovery")
+        case "VM": return String(localized: "Virtual Memory")
+        default: return role
+        }
     }
 }
 
@@ -111,7 +119,7 @@ final class DiskMapManager {
         cancelLock.withLock { $0 = false }
         await MainActor.run {
             isScanning = true
-            currentItem = "Reading APFS volume totals…"
+            currentItem = String(localized: "Reading APFS volume totals…")
             lastError = nil
         }
 
@@ -130,7 +138,7 @@ final class DiskMapManager {
                 Self.save(newSnapshot, to: fileURL)
             }
             if cancelRequested {
-                lastError = "Disk analysis was cancelled. The previous completed map is still shown."
+                lastError = String(localized: "Disk analysis was cancelled. The previous completed map is still shown.")
             } else {
                 lastError = result.error
             }
@@ -158,7 +166,7 @@ final class DiskMapManager {
         ),
         let diskInfo = Self.propertyList(diskInfoData)
         else {
-            return (nil, "SparkClean could not read the startup disk's APFS information.")
+            return (nil, String(localized: "SparkClean could not read the startup disk's APFS information."))
         }
 
         let containerReference = diskInfo["APFSContainerReference"] as? String ?? ""
@@ -169,7 +177,7 @@ final class DiskMapManager {
 
         guard !cancelRequested else { return (nil, nil) }
         DispatchQueue.main.async {
-            self.currentItem = "Measuring every readable file on the Data volume…"
+            self.currentItem = String(localized: "Measuring every readable file on the Data volume…")
         }
 
         let process = Process()
@@ -187,7 +195,7 @@ final class DiskMapManager {
             try process.run()
         } catch {
             processLock.withLock { $0 = nil }
-            return (nil, "SparkClean could not start the disk analyzer: \(error.localizedDescription)")
+            return (nil, String(localized: "SparkClean could not start the disk analyzer: \(error.localizedDescription)"))
         }
 
         let outputData = combinedPipe.fileHandleForReading.readDataToEndOfFile()
@@ -198,7 +206,7 @@ final class DiskMapManager {
 
         let parsed = Self.parseDUOutput(outputData)
         guard let measuredData = parsed.sizes[dataRoot] else {
-            return (nil, "The disk analyzer finished without a usable Data-volume result.")
+            return (nil, String(localized: "The disk analyzer finished without a usable Data-volume result."))
         }
 
         let dataRoots = Self.makeEntries(
@@ -241,9 +249,9 @@ final class DiskMapManager {
 
         let error: String?
         if !fullDiskAccess {
-            error = "Full Disk Access is required to measure protected Mail, Messages, Safari, and other app data."
+            error = String(localized: "Full Disk Access is required to measure protected Mail, Messages, Safari, and other app data.")
         } else if incomplete {
-            error = "Some macOS-owned locations could not be read. Their usage remains in Protected & APFS-managed space."
+            error = String(localized: "Some macOS-owned locations could not be read. Their usage remains in Protected & APFS-managed space.")
         } else {
             error = nil
         }
@@ -305,7 +313,9 @@ final class DiskMapManager {
             if directSize >= 1_048_576 {
                 entries.append(DiskMapEntry(
                     id: parent + "#direct-files",
-                    name: layer == .data ? "Other volume-root files" : "Other directly stored files",
+                    name: layer == .data
+                        ? String(localized: "Other volume-root files")
+                        : String(localized: "Other directly stored files"),
                     path: parent,
                     size: directSize,
                     measurementIncomplete: false
@@ -322,11 +332,11 @@ final class DiskMapManager {
     private static func friendlyName(for component: String, layer: EntryLayer) -> String {
         guard layer == .data else {
             switch component {
-            case ".cache": return "Developer & tool caches"
-            case ".npm": return "npm data"
-            case ".bun": return "Bun data"
-            case ".local": return "Local app data"
-            case ".Trash": return "Trash"
+            case ".cache": return String(localized: "Developer & tool caches")
+            case ".npm": return String(localized: "npm data")
+            case ".bun": return String(localized: "Bun data")
+            case ".local": return String(localized: "Local app data")
+            case ".Trash": return String(localized: "Trash")
             default:
                 return component.hasPrefix(".")
                     ? component
@@ -335,18 +345,18 @@ final class DiskMapManager {
         }
 
         switch component {
-        case "Users": return "User accounts"
-        case "Applications": return "Applications"
-        case "Library": return "Shared Library & app data"
-        case "System": return "Data-side system files"
-        case "private": return "System logs, databases & temporary files"
-        case "usr": return "Unix tools & shared data"
-        case "opt": return "Third-party command-line tools"
-        case ".DocumentRevisions-V100": return "Document Versions"
-        case ".PreviousSystemInformation": return "Previous System Information"
-        case ".Spotlight-V100": return "Spotlight index"
-        case ".fseventsd": return "File-system history"
-        case "MobileSoftwareUpdate": return "Software updates"
+        case "Users": return String(localized: "User accounts")
+        case "Applications": return String(localized: "Applications")
+        case "Library": return String(localized: "Shared Library & app data")
+        case "System": return String(localized: "Data-side system files")
+        case "private": return String(localized: "System logs, databases & temporary files")
+        case "usr": return String(localized: "Unix tools & shared data")
+        case "opt": return String(localized: "Third-party command-line tools")
+        case ".DocumentRevisions-V100": return String(localized: "Document Versions")
+        case ".PreviousSystemInformation": return String(localized: "Previous System Information")
+        case ".Spotlight-V100": return String(localized: "Spotlight index")
+        case ".fseventsd": return String(localized: "File-system history")
+        case "MobileSoftwareUpdate": return String(localized: "Software updates")
         default: return component
         }
     }

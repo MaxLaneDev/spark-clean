@@ -61,9 +61,9 @@ struct DiskUsageCardView: View {
             .help("Blue = used space, Orange = reclaimable by SparkClean, Gray = free space")
 
             HStack(spacing: 20) {
-                LegendDot(color: .blue, label: "Used", value: CleanupManager.formatBytes(max(0, disk.usedSpace - reclaimable)))
-                LegendDot(color: .orange, label: "Reclaimable", value: CleanupManager.formatBytes(reclaimable))
-                LegendDot(color: Color(nsColor: .separatorColor), label: "Free", value: CleanupManager.formatBytes(disk.freeSpace))
+                LegendDot(color: .blue, label: String(localized: "Used"), value: CleanupManager.formatBytes(max(0, disk.usedSpace - reclaimable)))
+                LegendDot(color: .orange, label: String(localized: "Reclaimable"), value: CleanupManager.formatBytes(reclaimable))
+                LegendDot(color: Color(nsColor: .separatorColor), label: String(localized: "Free"), value: CleanupManager.formatBytes(disk.freeSpace))
             }
             .font(.caption)
         }

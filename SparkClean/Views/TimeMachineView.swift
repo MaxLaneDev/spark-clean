@@ -51,8 +51,8 @@ struct TimeMachineView: View {
                     let ok = await manager.deleteSnapshots(toDelete)
                     selected.removeAll()
                     resultMessage = ok
-                        ? "Requested deletion of \(toDelete.count) snapshot(s). Remaining: \(manager.snapshots.count)."
-                        : (manager.lastError ?? "Snapshot deletion failed.")
+                        ? String(localized: "Requested deletion of \(toDelete.count) snapshot(s). Remaining: \(manager.snapshots.count).")
+                        : (manager.lastError ?? String(localized: "Snapshot deletion failed."))
                     showResult = true
                 }
             }
@@ -123,6 +123,7 @@ struct TimeMachineView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(snap.date.map { Self.displayFormatter.string(from: $0) } ?? snap.name)
                                 .font(.callout)
+                                .technicalTextDirection()
                             if snap.id == newestSnapshotID {
                                 Text("Most recent — kept for restore")
                                     .font(.caption2).foregroundStyle(.tertiary)
@@ -169,7 +170,11 @@ struct TimeMachineView: View {
             Spacer()
             Image(systemName: manager.isBusy ? "hourglass" : "checkmark.circle")
                 .font(.system(size: 40)).foregroundStyle(.secondary)
-            Text(manager.isBusy ? "Reading snapshots…" : "No local Time Machine snapshots")
+            Text(
+                manager.isBusy
+                    ? String(localized: "Reading snapshots…")
+                    : String(localized: "No local Time Machine snapshots")
+            )
                 .font(.headline)
             if let err = manager.lastError {
                 Text(err).font(.caption).foregroundStyle(.red)

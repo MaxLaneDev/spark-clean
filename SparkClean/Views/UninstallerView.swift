@@ -65,7 +65,7 @@ class UninstallerManager {
             apps = []
             selectedAppIDs = []
             scanProgress = 0
-            currentScanItem = "Finding applications..."
+            currentScanItem = String(localized: "Finding applications...")
         }
 
         let foundApps = await withCheckedContinuation { (continuation: CheckedContinuation<[AppInfo], Never>) in
@@ -425,14 +425,14 @@ class UninstallerManager {
                 $0.bundleURL?.standardizedFileURL.path == normalizedAppPath
         }) {
             guard running.terminate() else {
-                return UninstallOutcome(appFailureReason: "The application refused to quit.")
+                return UninstallOutcome(appFailureReason: String(localized: "The application refused to quit."))
             }
             let deadline = ContinuousClock.now + .seconds(5)
             while !running.isTerminated && ContinuousClock.now < deadline {
                 try? await Task.sleep(for: .milliseconds(100))
             }
             guard running.isTerminated else {
-                return UninstallOutcome(appFailureReason: "The application did not quit within five seconds.")
+                return UninstallOutcome(appFailureReason: String(localized: "The application did not quit within five seconds."))
             }
         }
 
@@ -503,13 +503,13 @@ class UninstallerManager {
                         ))
                     case .blocked(let reason):
                         if isApplication {
-                            outcome.appFailureReason = "Blocked by the deletion policy: \(reason)."
+                            outcome.appFailureReason = String(localized: "Blocked by the deletion policy: \(reason).")
                         } else {
                             outcome.failedRelatedItems += 1
                         }
                     case .skippedICloud:
                         if isApplication {
-                            outcome.appFailureReason = "The application is managed by a file provider."
+                            outcome.appFailureReason = String(localized: "The application is managed by a file provider.")
                         } else {
                             outcome.failedRelatedItems += 1
                         }
@@ -538,7 +538,7 @@ class UninstallerManager {
                 if trashOnly, !appNeedsAdmin.isEmpty {
                     let admin = appRemover.moveToTrashWithAdministratorPrivileges(
                         appNeedsAdmin,
-                        confirmationTitle: "Uninstall \(app.name) with Administrator Access"
+                        confirmationTitle: String(localized: "Uninstall \(app.name) with Administrator Access")
                     )
                     for removal in admin.removals {
                         record(removal)
@@ -546,8 +546,8 @@ class UninstallerManager {
                     outcome.appRemoved = admin.removals.count == appNeedsAdmin.count
                     if !outcome.appRemoved {
                         outcome.appFailureReason = admin.wasCancelled
-                            ? "Administrator authorization was cancelled."
-                            : (admin.failures.first ?? "Administrator removal failed.")
+                            ? String(localized: "Administrator authorization was cancelled.")
+                            : (admin.failures.first ?? String(localized: "Administrator removal failed."))
                     }
                 }
 
@@ -570,7 +570,7 @@ class UninstallerManager {
                 if trashOnly, !relatedNeedsAdmin.isEmpty {
                     let admin = relatedRemover.moveToTrashWithAdministratorPrivileges(
                         relatedNeedsAdmin,
-                        confirmationTitle: "\(app.name) Related Data Needs Administrator Access"
+                        confirmationTitle: String(localized: "\(app.name) Related Data Needs Administrator Access")
                     )
                     for removal in admin.removals {
                         record(removal)
@@ -591,49 +591,51 @@ class UninstallerManager {
 
     func exportReport(verbose: Bool) -> String {
         let dateStr = Date().formatted(date: .long, time: .standard)
+        let reportTitle = String(localized: "SparkClean - App Uninstaller Audit Report")
+        let generated = String(localized: "Generated: \(dateStr)")
         var r = """
         ╔═══════════════════════════════════════════════════════════════════╗
-        ║  SparkClean - App Uninstaller Audit Report                      ║
-        ║  Generated: \(dateStr)\(String(repeating: " ", count: max(0, 40 - dateStr.count)))║
+        ║  \(reportTitle)
+        ║  \(generated)
         ╚═══════════════════════════════════════════════════════════════════╝
 
         """
 
-        r += "SUMMARY\n"
+        r += String(localized: "SUMMARY") + "\n"
         r += String(repeating: "─", count: 60) + "\n"
-        r += "  Total Apps Scanned:  \(apps.count)\n"
+        r += "  " + String(localized: "Total Apps Scanned:") + " \(apps.count)\n"
 
         let totalAppSize = apps.reduce(0 as Int64) { $0 + $1.appSize }
         let totalRelated = apps.reduce(0 as Int64) { $0 + $1.totalRelatedSize }
         let totalAll = apps.reduce(0 as Int64) { $0 + $1.totalSize }
 
-        r += "  Total App Bundles:   \(CleanupManager.formatBytes(totalAppSize))\n"
-        r += "  Total Related Data:  \(CleanupManager.formatBytes(totalRelated))\n"
-        r += "  Grand Total:         \(CleanupManager.formatBytes(totalAll))\n\n"
+        r += "  " + String(localized: "Total App Bundles:") + " \(CleanupManager.formatBytes(totalAppSize))\n"
+        r += "  " + String(localized: "Total Related Data:") + " \(CleanupManager.formatBytes(totalRelated))\n"
+        r += "  " + String(localized: "Grand Total:") + " \(CleanupManager.formatBytes(totalAll))\n\n"
 
         r += "═══════════════════════════════════════════════════════════════════\n"
-        r += "INSTALLED APPLICATIONS (sorted by total size)\n"
+        r += String(localized: "INSTALLED APPLICATIONS (sorted by total size)") + "\n"
         r += "═══════════════════════════════════════════════════════════════════\n\n"
 
         let sorted = apps.sorted { $0.totalSize > $1.totalSize }
 
         for (idx, app) in sorted.enumerated() {
             r += "┌─── \(idx + 1). \(app.name)\n"
-            r += "│  Bundle ID:    \(app.bundleID)\n"
-            r += "│  App Path:     \(app.path)\n"
-            r += "│  App Size:     \(CleanupManager.formatBytes(app.appSize))\n"
-            r += "│  Related Data: \(CleanupManager.formatBytes(app.totalRelatedSize))\n"
-            r += "│  Total Size:   \(CleanupManager.formatBytes(app.totalSize))\n"
+            r += "│  " + String(localized: "Bundle ID:") + " \(AppLocalization.isolateTechnicalText(app.bundleID))\n"
+            r += "│  " + String(localized: "App Path:") + " \(AppLocalization.isolateTechnicalText(app.path))\n"
+            r += "│  " + String(localized: "App Size:") + " \(CleanupManager.formatBytes(app.appSize))\n"
+            r += "│  " + String(localized: "Related Data:") + " \(CleanupManager.formatBytes(app.totalRelatedSize))\n"
+            r += "│  " + String(localized: "Total Size:") + " \(CleanupManager.formatBytes(app.totalSize))\n"
 
             if app.relatedPaths.isEmpty {
-                r += "│  Related Files: None found\n"
+                r += "│  " + String(localized: "Related Files: None found") + "\n"
             } else {
-                r += "│  Related Files (\(app.relatedPaths.count) locations):\n"
+                r += "│  " + String(localized: "Related Files (\(app.relatedPaths.count) locations):") + "\n"
                 for related in app.relatedPaths {
-                    r += "│    ┊ [\(related.category)]\n"
-                    r += "│    ┊   Path:  \(related.path)\n"
-                    r += "│    ┊   Size:  \(CleanupManager.formatBytes(related.size))\n"
-                    r += "│    ┊   Files: \(related.fileCount)\n"
+                    r += "│    ┊ [\(related.displayCategory)]\n"
+                    r += "│    ┊   " + String(localized: "Path:") + " \(AppLocalization.isolateTechnicalText(related.path))\n"
+                    r += "│    ┊   " + String(localized: "Size:") + " \(CleanupManager.formatBytes(related.size))\n"
+                    r += "│    ┊   " + String(localized: "Files:") + " \(related.fileCount)\n"
                 }
             }
 
@@ -642,7 +644,7 @@ class UninstallerManager {
 
         // Top consumers
         r += "═══════════════════════════════════════════════════════════════════\n"
-        r += "TOP 10 LARGEST APPS (by total disk usage)\n"
+        r += String(localized: "TOP 10 LARGEST APPS (by total disk usage)") + "\n"
         r += "═══════════════════════════════════════════════════════════════════\n\n"
 
         for (idx, app) in sorted.prefix(10).enumerated() {
@@ -651,16 +653,16 @@ class UninstallerManager {
         }
 
         r += "\n═══════════════════════════════════════════════════════════════════\n"
-        r += "TOP 10 APPS WITH MOST RELATED DATA\n"
+        r += String(localized: "TOP 10 APPS WITH MOST RELATED DATA") + "\n"
         r += "═══════════════════════════════════════════════════════════════════\n\n"
 
         let sortedByRelated = apps.sorted { $0.totalRelatedSize > $1.totalRelatedSize }
         for (idx, app) in sortedByRelated.prefix(10).enumerated() where app.totalRelatedSize > 0 {
-            r += "  \(String(format: "%2d", idx + 1)). \(app.name.padding(toLength: 25, withPad: " ", startingAt: 0)) \(CleanupManager.formatBytes(app.totalRelatedSize).padding(toLength: 10, withPad: " ", startingAt: 0)) (\(app.relatedPaths.count) locations)\n"
+            r += "  \(String(format: "%2d", idx + 1)). \(app.name.padding(toLength: 25, withPad: " ", startingAt: 0)) \(CleanupManager.formatBytes(app.totalRelatedSize).padding(toLength: 10, withPad: " ", startingAt: 0)) " + String(localized: "(\(app.relatedPaths.count) locations)") + "\n"
         }
 
         r += "\n═══════════════════════════════════════════════════════════════════\n"
-        r += "END OF UNINSTALLER REPORT\n"
+        r += String(localized: "END OF UNINSTALLER REPORT") + "\n"
         r += "═══════════════════════════════════════════════════════════════════\n"
 
         return r
@@ -711,6 +713,7 @@ class UninstallerManager {
 // MARK: - Uninstaller View
 
 struct UninstallerView: View {
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var uninstaller = UninstallerManager()
     @State private var selectedApp: AppInfo? = nil
     @State private var showUninstallAlert = false
@@ -718,11 +721,33 @@ struct UninstallerView: View {
     @State private var showExportSheet = false
     @State private var isUninstalling = false
     @State private var uninstallError: String? = nil
-    @State private var uninstallIssueTitle = "Uninstall Failed"
+    @State private var uninstallIssueTitle = String(localized: "Uninstall Failed")
     @State private var exportReport = ""
     @State private var isGeneratingReport = false
     @State private var lastUninstalledApp: String? = nil
     @State private var isDropTargeted = false
+
+    private var appListPane: some View {
+        appListSection
+            .frame(minWidth: 340, idealWidth: 400)
+            .accessibilityIdentifier("uninstallerAppList")
+    }
+
+    @ViewBuilder
+    private var appDetailPane: some View {
+        if let app = selectedApp {
+            appDetailSection(app)
+                .frame(minWidth: 420, idealWidth: 500, maxWidth: .infinity)
+        } else {
+            VStack {
+                Spacer()
+                Text("Select an app to view details")
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -761,22 +786,12 @@ struct UninstallerView: View {
 
             if uninstaller.scanComplete {
                 HSplitView {
-                    // App list
-                    appListSection
-                        .frame(minWidth: 340, idealWidth: 400)
-
-                    // Detail panel
-                    if let app = selectedApp {
-                        appDetailSection(app)
-                            .frame(minWidth: 420, idealWidth: 500, maxWidth: .infinity)
+                    if layoutDirection == .rightToLeft {
+                        appDetailPane
+                        appListPane
                     } else {
-                        VStack {
-                            Spacer()
-                            Text("Select an app to view details")
-                                .foregroundStyle(.tertiary)
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        appListPane
+                        appDetailPane
                     }
                 }
             } else if uninstaller.isScanning {
@@ -797,8 +812,8 @@ struct UninstallerView: View {
                             uninstaller.apps.removeAll(where: { $0.id == app.id })
                             lastUninstalledApp = app.name
                             if outcome.failedRelatedItems > 0 {
-                                uninstallIssueTitle = "Uninstall Partially Completed"
-                                uninstallError = "\"\(app.name)\" was moved to Trash, but \(outcome.failedRelatedItems) selected leftover item(s) could not be removed."
+                                uninstallIssueTitle = String(localized: "Uninstall Partially Completed")
+                                uninstallError = String(localized: "\"\(app.name)\" was moved to Trash, but \(outcome.failedRelatedItems) selected leftover item(s) could not be removed.")
                             }
                             Task {
                                 try? await Task.sleep(for: .seconds(5))
@@ -807,8 +822,10 @@ struct UninstallerView: View {
                                 }
                             }
                         } else {
-                            uninstallIssueTitle = "Uninstall Failed"
-                            uninstallError = "Could not move \"\(app.name)\" to Trash. \(outcome.appFailureReason ?? "The item may be in use or require different permissions.")"
+                            uninstallIssueTitle = String(localized: "Uninstall Failed")
+                            let reason = outcome.appFailureReason
+                                ?? String(localized: "The item may be in use or require different permissions.")
+                            uninstallError = String(localized: "Could not move \"\(app.name)\" to Trash. \(reason)")
                         }
                         isUninstalling = false
                     }
@@ -871,7 +888,11 @@ struct UninstallerView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 12, weight: .semibold))
-                    Text(uninstaller.isScanning ? "Scanning..." : (uninstaller.scanComplete ? "Rescan" : "Scan Apps"))
+                    Text(
+                        uninstaller.isScanning
+                            ? String(localized: "Scanning...")
+                            : (uninstaller.scanComplete ? String(localized: "Rescan") : String(localized: "Scan Apps"))
+                    )
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .padding(.horizontal, 14)
@@ -947,17 +968,19 @@ struct UninstallerView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
+                            .technicalTextDirection()
 
                         HStack(spacing: 6) {
                             Text(app.path)
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
+                                .technicalTextDirection()
 
                             Button {
                                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: app.path)])
                             } label: {
-                                Image(systemName: "arrow.right.circle")
+                                Image(systemName: "arrow.forward.circle")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -971,9 +994,9 @@ struct UninstallerView: View {
 
                 // Size breakdown
                 HStack(spacing: 16) {
-                    sizeCard("App Bundle", size: app.appSize, color: .blue)
-                    sizeCard("Related Data", size: app.totalRelatedSize, color: .orange)
-                    sizeCard("Total", size: app.totalSize, color: .red)
+                    sizeCard(String(localized: "App Bundle"), size: app.appSize, color: .blue)
+                    sizeCard(String(localized: "Related Data"), size: app.totalRelatedSize, color: .orange)
+                    sizeCard(String(localized: "Total"), size: app.totalSize, color: .red)
                 }
 
                 // Related paths
@@ -1003,7 +1026,7 @@ struct UninstallerView: View {
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack(spacing: 6) {
-                                        Text(related.category)
+                                        Text(related.displayCategory)
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(hasSafetyNote ? .orange : .primary)
 
@@ -1029,6 +1052,7 @@ struct UninstallerView: View {
                                         .font(.caption)
                                         .foregroundStyle(.tertiary)
                                         .lineLimit(1)
+                                        .technicalTextDirection()
                                 }
 
                                 Spacer()
@@ -1190,7 +1214,11 @@ struct UninstallerView: View {
                 )
                 .animation(.easeInOut(duration: 0.2), value: isDropTargeted)
             VStack(spacing: 10) {
-                Text(isDropTargeted ? "Drop to Analyze" : "App Uninstaller")
+                Text(
+                    isDropTargeted
+                        ? String(localized: "Drop to Analyze")
+                        : String(localized: "App Uninstaller")
+                )
                     .font(.title2)
                     .fontWeight(.bold)
                 Text("Scan your Mac to find all installed apps and their\nrelated data. Or **drag an .app here** to analyze it instantly.")
@@ -1215,8 +1243,8 @@ struct UninstallerView: View {
                       values.isVolume != true
                 else {
                     Task { @MainActor in
-                        uninstallIssueTitle = "App Cannot Be Analyzed"
-                        uninstallError = "The dropped app is in a protected, cloud-managed, mounted, or symlinked location."
+                        uninstallIssueTitle = String(localized: "App Cannot Be Analyzed")
+                        uninstallError = String(localized: "The dropped app is in a protected, cloud-managed, mounted, or symlinked location.")
                     }
                     return
                 }
@@ -1262,12 +1290,13 @@ struct AppRowView: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                        .technicalTextDirection()
                 }
 
                 Spacer()
 
                 if app.totalRelatedSize > 0 {
-                    Text("+" + CleanupManager.formatBytes(app.totalRelatedSize))
+                    Text(String(localized: "+\(CleanupManager.formatBytes(app.totalRelatedSize))"))
                         .font(.caption2)
                         .foregroundStyle(.orange)
                 }

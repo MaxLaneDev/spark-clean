@@ -96,6 +96,16 @@ SparkClean needs Full Disk Access to scan folders that macOS restricts by defaul
 
 Cleanup and analysis run entirely on your Mac. There are no SparkClean accounts, analytics, telemetry, or uploaded scan results. Settings, size history, undo manifests, and deletion audit logs remain local; undo/audit records can contain file paths. The optional update checker contacts GitHub only when you request a check or enable automatic update checks, and downloads a release only to a location you choose.
 
+## Languages
+
+SparkClean supports English, Simplified Chinese, Japanese, German, and Hebrew.
+Hebrew uses a native right-to-left layout, while file paths, bundle identifiers,
+commands, and URLs remain left-to-right for readability. Choose a language in
+**Settings → General → Language**, then restart SparkClean when prompted.
+
+Translations are maintained in `SparkClean/Localizable.xcstrings`. See the
+[translation guide](CONTRIBUTING.md#adding-a-translation) to add or improve a language.
+
 ## Requirements
 
 - macOS 14.0+

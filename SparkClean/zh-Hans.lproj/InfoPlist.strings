@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "SparkClean";
+"NSAppleEventsUsageDescription" = "SparkClean 仅在您批准需要管理员权限的清理或维护操作时使用 Apple 事件。";
+"NSDesktopFolderUsageDescription" = "SparkClean 会扫描您的桌面以查找旧屏幕截图，帮助释放存储空间。";
+"NSDocumentsFolderUsageDescription" = "SparkClean 会扫描您的文稿文件夹以查找旧屏幕截图，帮助释放存储空间。";
+"NSDownloadsFolderUsageDescription" = "SparkClean 会扫描您的下载文件夹以查找旧文件和安装程序，帮助释放存储空间。";
+"NSSystemAdministrationUsageDescription" = "SparkClean 仅会为您明确确认的清理或维护操作请求管理员批准。";
