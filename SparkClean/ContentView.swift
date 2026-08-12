@@ -1463,6 +1463,14 @@ struct WhatsNewView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let releases: [ReleaseNote] = [
+        ReleaseNote(version: "1.5.0", date: "August 2026", notes: [
+            "New in-app language support — German, Hebrew, Japanese, and Simplified Chinese, with a native right-to-left layout for Hebrew",
+            "Switch languages anytime in Settings → General; takes effect after a one-click restart",
+            "The Uninstaller now correctly defaults high-risk app data (VM disks, databases, game libraries) to unselected in every language, not just English",
+            "Disk-usage percentages now follow your system's number format",
+            "Deletion audit logs stay consistent for support and troubleshooting regardless of your chosen display language",
+            "Corrected a handful of mistranslated app names and improved translation accuracy across the catalog",
+        ]),
         ReleaseNote(version: "1.4.0", date: "July 2026", notes: [
             "New Disk Map — accounts for the whole startup volume instead of showing cleanup results as total disk usage",
             "New Storage Insights — read-only sizes and trends for chat apps, Photos, Mail, iOS backups, simulators, and VMs",

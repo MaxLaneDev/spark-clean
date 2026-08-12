@@ -1,6 +1,202 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "August 2026": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "August 2026"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אוגוסט 2026"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2026年8月"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2026 年 8 月"
+          }
+        }
+      }
+    },
+    "New in-app language support — German, Hebrew, Japanese, and Simplified Chinese, with a native right-to-left layout for Hebrew": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neue In-App-Sprachunterstützung — Deutsch, Hebräisch, Japanisch und vereinfachtes Chinesisch, mit einem nativen Rechts-nach-links-Layout für Hebräisch"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמיכה חדשה בשפות בתוך האפליקציה — גרמנית, עברית, יפנית וסינית מפושטת, עם פריסה טבעית מימין לשמאל בעברית"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいアプリ内言語サポート — ドイツ語、ヘブライ語、日本語、簡体字中国語。ヘブライ語はネイティブの右から左レイアウトに対応"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增应用内语言支持 — 德语、希伯来语、日语和简体中文，希伯来语采用原生从右到左布局"
+          }
+        }
+      }
+    },
+    "Switch languages anytime in Settings → General; takes effect after a one-click restart": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprache jederzeit unter Einstellungen → Allgemein wechseln; wird nach einem Neustart per Klick wirksam"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתן להחליף שפה בכל עת דרך הגדרות ← כללי; השינוי ייכנס לתוקף לאחר הפעלה מחדש בלחיצה אחת"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定 → 一般でいつでも言語を切り替え可能。ワンクリックの再起動後に反映されます"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可随时在设置 → 通用中切换语言；重启后（一键完成）即可生效"
+          }
+        }
+      }
+    },
+    "The Uninstaller now correctly defaults high-risk app data (VM disks, databases, game libraries) to unselected in every language, not just English": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps entfernen wählt riskante App-Daten (VM-Images, Datenbanken, Spielebibliotheken) jetzt in jeder Sprache korrekt standardmäßig ab, nicht nur auf Englisch"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרת יישומים כעת מבטלת כברירת מחדל בחירה של נתוני אפליקציה בסיכון גבוה (תמונות VM, מסדי נתונים, ספריות משחקים) בכל שפה, לא רק באנגלית"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アンインストーラは、リスクの高いアプリデータ（VMディスク、データベース、ゲームライブラリ）の初期選択解除が、英語だけでなくすべての言語で正しく機能するようになりました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卸载应用现在能在所有语言下正确将高风险应用数据（虚拟机镜像、数据库、游戏库）默认设为不选中，而不仅限于英语"
+          }
+        }
+      }
+    },
+    "Disk-usage percentages now follow your system's number format": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Speicherplatz-Prozentangaben folgen jetzt dem Zahlenformat Ihres Systems"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אחוזי ניצול האחסון עוקבים כעת אחר פורמט המספרים של המערכת שלך"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ディスク使用率の表示が、システムの数値形式に従うようになりました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "磁盘使用百分比现在遵循系统的数字格式"
+          }
+        }
+      }
+    },
+    "Deletion audit logs stay consistent for support and troubleshooting regardless of your chosen display language": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschprotokolle bleiben für Support und Fehlersuche unabhängig von der gewählten Anzeigesprache konsistent"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יומני ביקורת המחיקה נשארים עקביים לצורכי תמיכה ואיתור תקלות, ללא קשר לשפת התצוגה שנבחרה"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択した表示言語に関わらず、削除の監査ログはサポートやトラブルシューティングのために一貫した形式を保ちます"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无论选择哪种显示语言，删除审计日志都会保持一致，便于支持和故障排查"
+          }
+        }
+      }
+    },
+    "Corrected a handful of mistranslated app names and improved translation accuracy across the catalog": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mehrere falsch übersetzte App-Namen wurden korrigiert und die Übersetzungsgenauigkeit im gesamten Katalog verbessert"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תוקנו מספר שמות אפליקציות שתורגמו בטעות, ושופר דיוק התרגום ברחבי הקטלוג"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カタログ内の誤訳されたアプリ名をいくつか修正し、翻訳全体の精度を向上させました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修正了目录中几处被错误翻译的应用名称，并提升了整体翻译准确性"
+          }
+        }
+      }
+    },
     "25": {
       "localizations": {
         "he": {
