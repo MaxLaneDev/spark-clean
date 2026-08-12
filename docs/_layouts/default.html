@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="{{ page.lang | default: 'en' }}" dir="{{ page.direction | default: 'ltr' }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page.title | default: site.title | escape }}</title>
+    <meta name="description" content="{{ page.description | default: site.description | escape }}">
+    <meta name="author" content="George Khananaev">
+    <meta name="robots" content="index, follow">
+    <base href="{{ page.asset_base }}">
+
+    <link rel="canonical" href="{{ page.url | absolute_url }}">
+    <link rel="alternate" hreflang="en" href="{{ '/' | absolute_url }}">
+    <link rel="alternate" hreflang="zh-Hans" href="{{ '/zh-hans/' | absolute_url }}">
+    <link rel="alternate" hreflang="ja" href="{{ '/ja/' | absolute_url }}">
+    <link rel="alternate" hreflang="de" href="{{ '/de/' | absolute_url }}">
+    <link rel="alternate" hreflang="he" href="{{ '/he/' | absolute_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ '/' | absolute_url }}">
+    <link rel="alternate" type="text/markdown" href="{{ page.markdown_url }}">
+    <link rel="describedby" href="{{ '/llms.txt' | absolute_url }}">
+    <link rel="sitemap" type="application/xml" href="{{ '/sitemap.xml' | absolute_url }}">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SparkClean">
+    <meta property="og:title" content="{{ page.title | default: site.title | escape }}">
+    <meta property="og:description" content="{{ page.description | default: site.description | escape }}">
+    <meta property="og:url" content="{{ page.url | absolute_url }}">
+    <meta property="og:image" content="https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/screenshots/social-preview.png">
+    <meta property="og:image:alt" content="SparkClean for macOS">
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="640">
+    <meta property="og:locale" content="{{ page.locale | default: 'en_US' }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ page.title | default: site.title | escape }}">
+    <meta name="twitter:description" content="{{ page.description | default: site.description | escape }}">
+    <meta name="twitter:image" content="https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/screenshots/social-preview.png">
+
+    <link rel="stylesheet" href="{{ '/assets/site.css' | absolute_url }}">
+    <link rel="icon" type="image/png" sizes="64x64" href="https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/SparkClean/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png">
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/SparkClean/Assets.xcassets/AppIcon.appiconset/icon_256x256.png">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "{{ '/' | absolute_url }}#website",
+            "url": "{{ '/' | absolute_url }}",
+            "name": "SparkClean",
+            "alternateName": "SparkClean for macOS",
+            "sameAs": "https://github.com/georgekhananaev/spark-clean"
+          },
+          {
+            "@type": "WebPage",
+            "@id": "{{ page.url | absolute_url }}#webpage",
+            "url": "{{ page.url | absolute_url }}",
+            "name": {{ page.title | default: site.title | jsonify }},
+            "description": {{ page.description | default: site.description | jsonify }},
+            "inLanguage": {{ page.lang | default: 'en' | jsonify }},
+            "isPartOf": { "@id": "{{ '/' | absolute_url }}#website" },
+            "about": { "@id": "{{ '/' | absolute_url }}#software" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "{{ '/' | absolute_url }}#software",
+            "name": "SparkClean",
+            "url": "{{ '/' | absolute_url }}",
+            "downloadUrl": "https://github.com/georgekhananaev/spark-clean/releases/latest",
+            "applicationCategory": "UtilitiesApplication",
+            "applicationSubCategory": "Disk Cleaner and Storage Analyzer",
+            "operatingSystem": "macOS 14 Sonoma or later",
+            "description": {{ page.description | default: site.description | jsonify }},
+            "inLanguage": {{ page.lang | default: 'en' | jsonify }},
+            "image": "https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/screenshots/social-preview.png",
+            "license": "https://github.com/georgekhananaev/spark-clean/blob/main/LICENSE",
+            "author": {
+              "@type": "Person",
+              "name": "George Khananaev",
+              "url": "https://github.com/georgekhananaev"
+            },
+            "featureList": [
+              "Developer cache cleanup",
+              "Disk storage analysis",
+              "Duplicate file finder",
+              "Application uninstaller",
+              "Trash-backed cleanup recovery",
+              "On-device scanning"
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="{{ page.url | absolute_url }}#content">{{ page.skip_label | default: 'Skip to content' }}</a>
+    <header class="site-header">
+      <a class="brand" href="{{ '/' | absolute_url }}" aria-label="SparkClean home">
+        <span aria-hidden="true">✨</span>
+        <span>SparkClean</span>
+      </a>
+      <nav class="language-nav" aria-label="{{ page.language_label | default: 'Languages' }}">
+        <a href="{{ '/' | absolute_url }}" lang="en">English</a>
+        <a href="{{ '/zh-hans/' | absolute_url }}" lang="zh-Hans">简体中文</a>
+        <a href="{{ '/ja/' | absolute_url }}" lang="ja">日本語</a>
+        <a href="{{ '/de/' | absolute_url }}" lang="de">Deutsch</a>
+        <a href="{{ '/he/' | absolute_url }}" lang="he" dir="rtl">עברית</a>
+      </nav>
+      <a class="repo-link" href="https://github.com/georgekhananaev/spark-clean">GitHub</a>
+    </header>
+
+    <main id="content" class="site-main">
+      {{ content }}
+    </main>
+
+    <footer class="site-footer">
+      <p>{{ page.footer_label | default: 'Created by' }} <a href="https://github.com/georgekhananaev">George Khananaev</a>.</p>
+      <p><a href="https://github.com/georgekhananaev/spark-clean/blob/main/LICENSE">{{ page.license_label | default: 'License' }}</a> · <a href="https://github.com/georgekhananaev/spark-clean/issues">{{ page.issues_label | default: 'Issues' }}</a> · <a href="https://github.com/georgekhananaev/spark-clean/releases">{{ page.releases_label | default: 'Releases' }}</a></p>
+    </footer>
+  </body>
+</html>

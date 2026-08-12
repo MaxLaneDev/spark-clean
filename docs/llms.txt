@@ -1,0 +1,38 @@
+# SparkClean
+
+> SparkClean is a native macOS disk cleaner and storage analyzer for developer machines. It finds reviewable Xcode, Docker, node_modules, cache, duplicate-file, application-leftover, and disk-usage results without uploading scan data.
+
+SparkClean requires macOS 14 Sonoma or later and supports Apple Silicon and Intel Macs. Cleanup results are labeled Safe, Review, or Caution. Approved files move to Trash by default, protected locations are excluded, and the most recent Trash-backed cleanup can be restored before Trash is emptied. Command-based operations such as Docker pruning are identified separately.
+
+The complete source is available to inspect and modify. SparkClean is free for personal, educational, academic, and other non-commercial use under its non-commercial license. It is source-available rather than OSI-approved open source. The project is created and maintained by George Khananaev.
+
+## Product and User Documentation
+
+- [Complete README](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/README.md): Features, screenshots, workflows, permissions, privacy, settings, keyboard shortcuts, requirements, and build instructions.
+- [Supported Features](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/SUPPORTED.md): Detailed cleanup coverage, supported tools, safety behavior, and deliberate exclusions.
+- [Release History](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/CHANGELOG.md): Versioned changes and fixes.
+- [License](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/LICENSE): Authoritative usage and contribution terms.
+
+## Localized Overviews
+
+- [English](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/docs/index.md): English product overview and common questions.
+- [Simplified Chinese](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/docs/zh-hans/index.md): 简体中文产品介绍、功能说明和常见问题。
+- [Japanese](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/docs/ja/index.md): 日本語の製品紹介、機能説明、よくある質問。
+- [German](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/docs/de/index.md): Deutsche Produktübersicht, Funktionen und häufige Fragen.
+- [Hebrew](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/docs/he/index.md): סקירת המוצר, התכונות והשאלות הנפוצות בעברית.
+
+## Contributing
+
+- [Contribution Guide](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/CONTRIBUTING.md): Development workflow, code style, issue reporting, and contribution terms.
+- [Translation Contribution Guide](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/docs/TRANSLATIONS.md): How to correct an existing translation or add a language safely.
+- [GitHub Issues](https://github.com/georgekhananaev/spark-clean/issues): Bug reports and feature requests.
+
+## Downloads and Source
+
+- [Latest Release](https://github.com/georgekhananaev/spark-clean/releases/latest): Current SparkClean download.
+- [Source Repository](https://github.com/georgekhananaev/spark-clean): Canonical GitHub repository.
+
+## Optional
+
+- [Release and Distribution Notes](https://raw.githubusercontent.com/georgekhananaev/spark-clean/main/docs/RELEASE.md): Signing, notarization, packaging, and Homebrew preparation.
+

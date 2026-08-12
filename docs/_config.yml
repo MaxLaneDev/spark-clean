@@ -1,0 +1,10 @@
+title: SparkClean
+description: A review-first macOS disk cleaner and storage analyzer for developer machines.
+url: "https://georgekhananaev.github.io"
+baseurl: "/spark-clean"
+repository: georgekhananaev/spark-clean
+author:
+  name: George Khananaev
+markdown: kramdown
+permalink: pretty
+
