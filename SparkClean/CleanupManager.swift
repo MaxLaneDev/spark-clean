@@ -306,32 +306,32 @@ class CleanupManager {
 
         // ═══════════ SYSTEM (safe caches & logs) ═══════════
 
-        ScanDefinition(name: "System Logs", icon: "doc.text", color: .green,
+        ScanDefinition(name: "System Logs", stableName: "System Logs", icon: "doc.text", color: .green,
             description: "Current and historical log files — review if you are diagnosing an issue",
             group: .system, safetyLevel: .review, defaultSelected: false) {
             // Exclude DiagnosticReports subdirectory (scanned separately)
             ["\(home)/Library/Logs", "/Library/Logs"]
         },
 
-        ScanDefinition(name: "Crash Reports", icon: "exclamationmark.triangle", color: .orange,
+        ScanDefinition(name: "Crash Reports", stableName: "Crash Reports", icon: "exclamationmark.triangle", color: .orange,
             description: "App crash reports and diagnostics — safe to remove",
             group: .system, safetyLevel: .safe) {
             ["\(home)/Library/Logs/DiagnosticReports", "/Library/Logs/DiagnosticReports"]
         },
 
-        ScanDefinition(name: "Saved App State", icon: "rectangle.stack", color: .indigo,
+        ScanDefinition(name: "Saved App State", stableName: "Saved App State", icon: "rectangle.stack", color: .indigo,
             description: "App resume data — removing it can discard restored windows or session state",
             group: .system, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/Library/Saved Application State"]
         },
 
-        ScanDefinition(name: "Software Update Cache", icon: "arrow.down.circle", color: .blue,
+        ScanDefinition(name: "Software Update Cache", stableName: "Software Update Cache", icon: "arrow.down.circle", color: .blue,
             description: "Per-user software-update cache — system-managed update staging is not touched",
             group: .system, safetyLevel: .safe) {
             ["\(home)/Library/Caches/com.apple.SoftwareUpdate"]
         },
 
-        ScanDefinition(name: "Trash", icon: "trash", color: .gray,
+        ScanDefinition(name: "Trash", stableName: "Trash", icon: "trash", color: .gray,
             description: "Items already in your Trash — empty to reclaim space",
             group: .system, safetyLevel: .review, defaultSelected: false,
             requiresPermanentDeletion: true) {
@@ -340,7 +340,7 @@ class CleanupManager {
 
         // ═══════════ BROWSERS (safe — caches rebuild) ═══════════
 
-        ScanDefinition(name: "Safari Cache", icon: "safari", color: .cyan,
+        ScanDefinition(name: "Safari Cache", stableName: "Safari Cache", icon: "safari", color: .cyan,
             description: "Safari browser cache — will be rebuilt as you browse",
             group: .browsers, safetyLevel: .safe,
             associatedBundleIDs: ["com.apple.Safari"]) {
@@ -349,7 +349,7 @@ class CleanupManager {
              "\(home)/Library/Caches/com.apple.WebKit.Networking"]
         },
 
-        ScanDefinition(name: "Chrome Cache", icon: "globe", color: .yellow,
+        ScanDefinition(name: "Chrome Cache", stableName: "Chrome Cache", icon: "globe", color: .yellow,
             description: "Chrome cache, GPU cache, service workers — rebuilt automatically",
             group: .browsers, safetyLevel: .safe,
             associatedBundleIDs: ["com.google.Chrome"]) {
@@ -375,7 +375,7 @@ class CleanupManager {
             return paths
         },
 
-        ScanDefinition(name: "Firefox Cache", icon: "flame", color: .orange,
+        ScanDefinition(name: "Firefox Cache", stableName: "Firefox Cache", icon: "flame", color: .orange,
             description: "Firefox cache and crash reports",
             group: .browsers, safetyLevel: .safe,
             associatedBundleIDs: ["org.mozilla.firefox"]) {
@@ -384,7 +384,7 @@ class CleanupManager {
              "\(home)/Library/Application Support/Firefox/Crash Reports"]
         },
 
-        ScanDefinition(name: "Arc Cache", icon: "compass.drawing", color: .blue,
+        ScanDefinition(name: "Arc Cache", stableName: "Arc Cache", icon: "compass.drawing", color: .blue,
             description: "Arc browser cache",
             group: .browsers, safetyLevel: .safe,
             associatedBundleIDs: ["company.thebrowser.Browser"]) {
@@ -394,7 +394,7 @@ class CleanupManager {
              "\(home)/Library/Application Support/Arc/User Data/Default/Code Cache"]
         },
 
-        ScanDefinition(name: "Edge Cache", icon: "globe.americas", color: .cyan,
+        ScanDefinition(name: "Edge Cache", stableName: "Edge Cache", icon: "globe.americas", color: .cyan,
             description: "Microsoft Edge cache",
             group: .browsers, safetyLevel: .safe,
             associatedBundleIDs: ["com.microsoft.edgemac"]) {
@@ -404,7 +404,7 @@ class CleanupManager {
              "\(home)/Library/Application Support/Microsoft Edge/Default/GPUCache"]
         },
 
-        ScanDefinition(name: "Brave Cache", icon: "shield", color: .orange,
+        ScanDefinition(name: "Brave Cache", stableName: "Brave Cache", icon: "shield", color: .orange,
             description: "Brave browser cache",
             group: .browsers, safetyLevel: .safe,
             associatedBundleIDs: ["com.brave.Browser"]) {
@@ -415,7 +415,7 @@ class CleanupManager {
 
         // ═══════════ PRIVACY (review/caution — user data) ═══════════
 
-        ScanDefinition(name: "Recent Items", icon: "clock.arrow.circlepath", color: .indigo,
+        ScanDefinition(name: "Recent Items", stableName: "Recent Items", icon: "clock.arrow.circlepath", color: .indigo,
             description: "Recent applications, documents, hosts, and servers — Finder favorites are preserved",
             group: .privacy, safetyLevel: .review, defaultSelected: false) {
             let base = "\(home)/Library/Application Support/com.apple.sharedfilelist"
@@ -430,14 +430,14 @@ class CleanupManager {
                 .map { (base as NSString).appendingPathComponent($0) }
         },
 
-        ScanDefinition(name: "Spotlight History", icon: "magnifyingglass", color: .indigo,
+        ScanDefinition(name: "Spotlight History", stableName: "Spotlight History", icon: "magnifyingglass", color: .indigo,
             description: "Spotlight search history and shortcuts — reveals what you've searched for",
             group: .privacy, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/Library/Application Support/com.apple.spotlight.Shortcuts",
              "\(home)/Library/Caches/com.apple.Spotlight"]
         },
 
-        ScanDefinition(name: "Shell History", icon: "terminal", color: .indigo,
+        ScanDefinition(name: "Shell History", stableName: "Shell History", icon: "terminal", color: .indigo,
             description: "Terminal command history — zsh, bash, Python, Node.js, Ruby REPL",
             group: .privacy, safetyLevel: .review, defaultSelected: false,
             allowsDirectHomeItems: true) {
@@ -450,7 +450,7 @@ class CleanupManager {
              "\(home)/.wget-hsts"]
         },
 
-        ScanDefinition(name: "Safari History", icon: "safari", color: .indigo,
+        ScanDefinition(name: "Safari History", stableName: "Safari History", icon: "safari", color: .indigo,
             description: "Safari browsing history and recent tabs — close Safari first",
             group: .privacy, safetyLevel: .caution, defaultSelected: false,
             associatedBundleIDs: ["com.apple.Safari"]) {
@@ -463,7 +463,7 @@ class CleanupManager {
              "\(home)/Library/Safari/TopSites.plist"]
         },
 
-        ScanDefinition(name: "Chrome History", icon: "globe", color: .indigo,
+        ScanDefinition(name: "Chrome History", stableName: "Chrome History", icon: "globe", color: .indigo,
             description: "Chrome browsing history across all profiles — close Chrome first",
             group: .privacy, safetyLevel: .caution, defaultSelected: false,
             associatedBundleIDs: ["com.google.Chrome"]) {
@@ -487,7 +487,7 @@ class CleanupManager {
             return paths
         },
 
-        ScanDefinition(name: "Firefox Form History", icon: "flame", color: .indigo,
+        ScanDefinition(name: "Firefox Form History", stableName: "Firefox Form History", icon: "flame", color: .indigo,
             description: "Firefox form autofill data — close Firefox first",
             group: .privacy, safetyLevel: .caution, defaultSelected: false,
             associatedBundleIDs: ["org.mozilla.firefox"]) {
@@ -503,7 +503,7 @@ class CleanupManager {
             return paths
         },
 
-        ScanDefinition(name: "Browser Cookies", icon: "birthday.cake", color: .indigo,
+        ScanDefinition(name: "Browser Cookies", stableName: "Browser Cookies", icon: "birthday.cake", color: .indigo,
             description: "Safari and Chrome cookies — will log you out of websites; close both browsers first",
             group: .privacy, safetyLevel: .caution, defaultSelected: false,
             associatedBundleIDs: ["com.apple.Safari", "com.google.Chrome"]) {
@@ -525,20 +525,20 @@ class CleanupManager {
 
         // ═══════════ DEVELOPER (safe — build artifacts rebuild) ═══════════
 
-        ScanDefinition(name: "Xcode Derived Data", icon: "hammer", color: .pink,
+        ScanDefinition(name: "Xcode Derived Data", stableName: "Xcode Derived Data", icon: "hammer", color: .pink,
             description: "Xcode build artifacts — rebuilt on next build",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/Library/Developer/Xcode/DerivedData"]
         },
 
-        ScanDefinition(name: "Xcode Caches", icon: "xmark.bin", color: .indigo,
+        ScanDefinition(name: "Xcode Caches", stableName: "Xcode Caches", icon: "xmark.bin", color: .indigo,
             description: "Xcode and Simulator generated caches — rebuilt as needed",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/Library/Caches/com.apple.dt.Xcode",
              "\(home)/Library/Developer/CoreSimulator/Caches"]
         },
 
-        ScanDefinition(name: "Xcode Device Support", icon: "iphone", color: .indigo,
+        ScanDefinition(name: "Xcode Device Support", stableName: "Xcode Device Support", icon: "iphone", color: .indigo,
             description: "All downloaded device-support symbols — large and re-downloadable, but not necessarily old",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/Library/Developer/Xcode/iOS DeviceSupport",
@@ -547,19 +547,19 @@ class CleanupManager {
              "\(home)/Library/Developer/Xcode/macOS DeviceSupport"]
         },
 
-        ScanDefinition(name: "Xcode Previews", icon: "rectangle.on.rectangle", color: .pink,
+        ScanDefinition(name: "Xcode Previews", stableName: "Xcode Previews", icon: "rectangle.on.rectangle", color: .pink,
             description: "SwiftUI preview build data — rebuilt automatically",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/Library/Developer/Xcode/UserData/Previews"]
         },
 
-        ScanDefinition(name: "Xcode Archives", icon: "archivebox", color: .purple,
+        ScanDefinition(name: "Xcode Archives", stableName: "Xcode Archives", icon: "archivebox", color: .purple,
             description: "Old build archives — may contain release builds you need",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/Library/Developer/Xcode/Archives"]
         },
 
-        ScanDefinition(name: "Android / Gradle", icon: "cpu", color: .green,
+        ScanDefinition(name: "Android / Gradle", stableName: "Android / Gradle", icon: "cpu", color: .green,
             description: "Android build caches and Gradle — rebuilt on next build",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/.gradle/caches", "\(home)/.gradle/wrapper/dists",
@@ -568,26 +568,26 @@ class CleanupManager {
 
         // ═══════════ PACKAGE MANAGERS (safe — caches re-download) ═══════════
 
-        ScanDefinition(name: "Homebrew Cache", icon: "mug", color: .brown,
+        ScanDefinition(name: "Homebrew Cache", stableName: "Homebrew Cache", icon: "mug", color: .brown,
             description: "Downloaded packages — re-downloaded on next install",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/Library/Caches/Homebrew", "/opt/homebrew/Caches",
              "\(home)/Library/Logs/Homebrew"]
         },
 
-        ScanDefinition(name: "CocoaPods Cache", icon: "shippingbox", color: .brown,
+        ScanDefinition(name: "CocoaPods Cache", stableName: "CocoaPods Cache", icon: "shippingbox", color: .brown,
             description: "Pod cache — re-downloaded on pod install",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/Library/Caches/CocoaPods"]
         },
 
-        ScanDefinition(name: "Swift Package Cache", icon: "swift", color: .orange,
+        ScanDefinition(name: "Swift Package Cache", stableName: "Swift Package Cache", icon: "swift", color: .orange,
             description: "Swift Package Manager cache — re-downloaded as needed",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/Library/Caches/org.swift.swiftpm"]
         },
 
-        ScanDefinition(name: "npm / Yarn / pnpm / Bun", icon: "shippingbox", color: .red,
+        ScanDefinition(name: "npm / Yarn / pnpm / Bun", stableName: "npm / Yarn / pnpm / Bun", icon: "shippingbox", color: .red,
             description: "JS package caches — re-downloaded on install",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/.npm", "\(home)/Library/Caches/Yarn", "\(home)/.yarn/cache",
@@ -595,49 +595,49 @@ class CleanupManager {
              "\(home)/.bun/install/cache"]
         },
 
-        ScanDefinition(name: "pip Cache", icon: "puzzlepiece", color: .green,
+        ScanDefinition(name: "pip Cache", stableName: "pip Cache", icon: "puzzlepiece", color: .green,
             description: "Python download cache — packages are re-fetched on install",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/Library/Caches/pip", "\(home)/.cache/pip"]
         },
 
-        ScanDefinition(name: "Conda Package Stores", icon: "shippingbox", color: .green,
+        ScanDefinition(name: "Conda Package Stores", stableName: "Conda Package Stores", icon: "shippingbox", color: .green,
             description: "Conda package stores — removal can break environments that use symlinked packages",
             group: .packageManagers, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/.conda/pkgs", "\(home)/anaconda3/pkgs", "\(home)/miniconda3/pkgs"]
         },
 
-        ScanDefinition(name: "Ruby Bundler Cache", icon: "diamond", color: .red,
+        ScanDefinition(name: "Ruby Bundler Cache", stableName: "Ruby Bundler Cache", icon: "diamond", color: .red,
             description: "Bundler package cache — installed user gems are not touched",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/.bundle/cache"]
         },
 
-        ScanDefinition(name: "Go Cache", icon: "server.rack", color: .cyan,
+        ScanDefinition(name: "Go Cache", stableName: "Go Cache", icon: "server.rack", color: .cyan,
             description: "Go build and module caches",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/Library/Caches/go-build", "\(home)/go/pkg/mod/cache"]
         },
 
-        ScanDefinition(name: "Cargo / Rust", icon: "gearshape.2", color: .orange,
+        ScanDefinition(name: "Cargo / Rust", stableName: "Cargo / Rust", icon: "gearshape.2", color: .orange,
             description: "Cargo registry and build cache",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/.cargo/registry", "\(home)/.cargo/git"]
         },
 
-        ScanDefinition(name: "Maven", icon: "building.columns", color: .indigo,
+        ScanDefinition(name: "Maven", stableName: "Maven", icon: "building.columns", color: .indigo,
             description: "Maven local repository — may contain locally built artifacts unavailable remotely",
             group: .packageManagers, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/.m2/repository"]
         },
 
-        ScanDefinition(name: "Composer Cache", icon: "cube", color: .purple,
+        ScanDefinition(name: "Composer Cache", stableName: "Composer Cache", icon: "cube", color: .purple,
             description: "Composer download cache — re-fetched on install",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/.composer/cache"]
         },
 
-        ScanDefinition(name: "NuGet / Dart Package Stores", icon: "shippingbox", color: .purple,
+        ScanDefinition(name: "NuGet / Dart Package Stores", stableName: "NuGet / Dart Package Stores", icon: "shippingbox", color: .purple,
             description: "Local package stores — deleting may remove offline packages or activated Dart tools",
             group: .packageManagers, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/.nuget/packages", "\(home)/.pub-cache"]
@@ -652,7 +652,7 @@ class CleanupManager {
         // (Docker Images, Docker Containers, Docker Build Cache) which give accurate
         // per-resource sizes. Users who want to fully remove Docker can use the Uninstaller.
 
-        ScanDefinition(name: "Docker Logs & Cache", icon: "cube.box", color: .blue,
+        ScanDefinition(name: "Docker Logs & Cache", stableName: "Docker Logs & Cache", icon: "cube.box", color: .blue,
             description: "Docker Desktop generated logs and cache — CLI plugins and builder configuration are not touched",
             group: .docker, safetyLevel: .safe) {
             ["\(home)/Library/Caches/com.docker.docker",
@@ -661,7 +661,7 @@ class CleanupManager {
 
         // ═══════════ APPLICATIONS (safe — app caches rebuild) ═══════════
 
-        ScanDefinition(name: "VS Code / Cursor Cache", icon: "curlybraces", color: .blue,
+        ScanDefinition(name: "VS Code / Cursor Cache", stableName: "VS Code / Cursor Cache", icon: "curlybraces", color: .blue,
             description: "IDE caches and logs — rebuilt automatically",
             group: .applications, safetyLevel: .safe) {
             ["\(home)/Library/Caches/com.microsoft.VSCode",
@@ -678,13 +678,13 @@ class CleanupManager {
              "\(home)/Library/Caches/com.todesktop.runtime.Cursor"]
         },
 
-        ScanDefinition(name: "JetBrains IDEs Cache", icon: "chevron.left.forwardslash.chevron.right", color: .orange,
+        ScanDefinition(name: "JetBrains IDEs Cache", stableName: "JetBrains IDEs Cache", icon: "chevron.left.forwardslash.chevron.right", color: .orange,
             description: "IntelliJ, WebStorm, PyCharm caches/logs — rebuilt on launch",
             group: .applications, safetyLevel: .safe) {
             ["\(home)/Library/Caches/JetBrains", "\(home)/Library/Logs/JetBrains"]
         },
 
-        ScanDefinition(name: "Adobe Cache", icon: "paintbrush", color: .red,
+        ScanDefinition(name: "Adobe Cache", stableName: "Adobe Cache", icon: "paintbrush", color: .red,
             description: "Adobe media cache — rebuilt when editing",
             group: .applications, safetyLevel: .safe) {
             ["\(home)/Library/Caches/Adobe",
@@ -692,7 +692,7 @@ class CleanupManager {
              "\(home)/Library/Application Support/Adobe/Common/Media Cache"]
         },
 
-        ScanDefinition(name: "Spotify Cache", icon: "music.note", color: .green,
+        ScanDefinition(name: "Spotify Cache", stableName: "Spotify Cache", icon: "music.note", color: .green,
             description: "Spotify persistent/offline cache — media may need to be downloaded again",
             group: .applications, safetyLevel: .review, defaultSelected: false,
             associatedBundleIDs: ["com.spotify.client"]) {
@@ -700,7 +700,7 @@ class CleanupManager {
              "\(home)/Library/Application Support/Spotify/PersistentCache"]
         },
 
-        ScanDefinition(name: "Slack Cache", icon: "number", color: .purple,
+        ScanDefinition(name: "Slack Cache", stableName: "Slack Cache", icon: "number", color: .purple,
             description: "Slack cache — rebuilt when you open channels",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["com.tinyspeck.slackmacgap"]) {
@@ -710,7 +710,7 @@ class CleanupManager {
              "\(home)/Library/Application Support/Slack/Code Cache"]
         },
 
-        ScanDefinition(name: "Discord Cache", icon: "bubble.left.and.bubble.right", color: .indigo,
+        ScanDefinition(name: "Discord Cache", stableName: "Discord Cache", icon: "bubble.left.and.bubble.right", color: .indigo,
             description: "Discord cache — rebuilt automatically",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["com.hnc.Discord"]) {
@@ -720,7 +720,7 @@ class CleanupManager {
              "\(home)/Library/Application Support/discord/GPUCache"]
         },
 
-        ScanDefinition(name: "Teams Cache", icon: "person.3", color: .blue,
+        ScanDefinition(name: "Teams Cache", stableName: "Teams Cache", icon: "person.3", color: .blue,
             description: "Microsoft Teams cache",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["com.microsoft.teams2"]) {
@@ -729,21 +729,21 @@ class CleanupManager {
              "\(home)/Library/Application Support/Microsoft Teams/Cache"]
         },
 
-        ScanDefinition(name: "Zoom Cache", icon: "video", color: .blue,
+        ScanDefinition(name: "Zoom Cache", stableName: "Zoom Cache", icon: "video", color: .blue,
             description: "Zoom cache — rebuilt on meetings",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["us.zoom.xos"]) {
             ["\(home)/Library/Caches/us.zoom.xos"]
         },
 
-        ScanDefinition(name: "Telegram Cache", icon: "paperplane", color: .blue,
+        ScanDefinition(name: "Telegram Cache", stableName: "Telegram Cache", icon: "paperplane", color: .blue,
             description: "Telegram media cache — re-downloaded from cloud",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["ru.keepcoder.Telegram"]) {
             ["\(home)/Library/Caches/ru.keepcoder.Telegram"]
         },
 
-        ScanDefinition(name: "Microsoft Office Cache", icon: "doc.richtext", color: .blue,
+        ScanDefinition(name: "Microsoft Office Cache", stableName: "Microsoft Office Cache", icon: "doc.richtext", color: .blue,
             description: "Office app caches — rebuilt on use",
             group: .applications, safetyLevel: .safe) {
             ["\(home)/Library/Caches/com.microsoft.Word",
@@ -753,7 +753,7 @@ class CleanupManager {
         },
 
         ScanDefinition(
-            name: "Quick Look Cache", icon: "eye.square", color: .gray,
+            name: "Quick Look Cache", stableName: "Quick Look Cache", icon: "eye.square", color: .gray,
             description: "Thumbnail previews — rebuilds automatically",
             group: .system, safetyLevel: .safe
         ) {
@@ -763,13 +763,13 @@ class CleanupManager {
 
         // ═══════════ AI / ML TOOLS (high impact — models can be huge) ═══════════
 
-        ScanDefinition(name: "HuggingFace Models Cache", icon: "brain", color: .purple,
+        ScanDefinition(name: "HuggingFace Models Cache", stableName: "HuggingFace Models Cache", icon: "brain", color: .purple,
             description: "Downloaded ML models — re-downloaded on demand",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/.cache/huggingface"]
         },
 
-        ScanDefinition(name: "LM Studio Models", icon: "cpu.fill", color: .indigo,
+        ScanDefinition(name: "LM Studio Models", stableName: "LM Studio Models", icon: "cpu.fill", color: .indigo,
             description: "LM Studio model files — re-downloaded from hub",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/.cache/lm-studio"]
@@ -777,19 +777,19 @@ class CleanupManager {
 
         // ═══════════ ADDITIONAL DEVELOPER CACHES ═══════════
 
-        ScanDefinition(name: "Bazel Cache", icon: "hammer.fill", color: .gray,
+        ScanDefinition(name: "Bazel Cache", stableName: "Bazel Cache", icon: "hammer.fill", color: .gray,
             description: "Bazel build system cache — rebuilt on next build",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/.cache/bazel", "\(home)/.cache/bazelisk"]
         },
 
-        ScanDefinition(name: "Deno Cache", icon: "d.circle", color: .teal,
+        ScanDefinition(name: "Deno Cache", stableName: "Deno Cache", icon: "d.circle", color: .teal,
             description: "Deno module cache — the ~/.deno installation and binaries are not touched",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/Library/Caches/deno", "\(home)/.cache/deno"]
         },
 
-        ScanDefinition(name: "Poetry Cache", icon: "text.book.closed", color: .purple,
+        ScanDefinition(name: "Poetry Cache", stableName: "Poetry Cache", icon: "text.book.closed", color: .purple,
             description: "Poetry Python package cache — re-downloaded on install",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/Library/Caches/pypoetry", "\(home)/.cache/pypoetry"]
@@ -797,27 +797,27 @@ class CleanupManager {
 
         // ═══════════ ADDITIONAL SYSTEM CLEANUP ═══════════
 
-        ScanDefinition(name: "Font Caches", icon: "textformat", color: .gray,
+        ScanDefinition(name: "Font Caches", stableName: "Font Caches", icon: "textformat", color: .gray,
             description: "Font rendering caches — rebuilt automatically on login",
             group: .system, safetyLevel: .safe) {
             ["\(home)/Library/Caches/com.apple.FontRegistry",
              "/Library/Caches/com.apple.ATS"]
         },
 
-        ScanDefinition(name: "Speech Data Cache", icon: "waveform", color: .blue,
+        ScanDefinition(name: "Speech Data Cache", stableName: "Speech Data Cache", icon: "waveform", color: .blue,
             description: "Speech recognition cache — rebuilt when needed",
             group: .system, safetyLevel: .safe) {
             ["\(home)/Library/Caches/com.apple.SpeechRecognitionCore"]
         },
 
-        ScanDefinition(name: "Xcode Playground Cache", icon: "play.rectangle", color: .pink,
+        ScanDefinition(name: "Xcode Playground Cache", stableName: "Xcode Playground Cache", icon: "play.rectangle", color: .pink,
             description: "Swift Playground execution and virtual-device data — review before removal",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/Library/Developer/Xcode/UserData/Playgrounds",
              "\(home)/Library/Developer/XCPGDevices"]
         },
 
-        ScanDefinition(name: "Provisioning Profiles", icon: "shield.checkered", color: .indigo,
+        ScanDefinition(name: "Provisioning Profiles", stableName: "Provisioning Profiles", icon: "shield.checkered", color: .indigo,
             description: "iOS/macOS provisioning profiles — re-downloaded from developer portal",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/Library/MobileDevice/Provisioning Profiles"]
@@ -825,7 +825,7 @@ class CleanupManager {
 
         // ═══════════ DEVELOPER TOOL CACHES (F6) — all regenerable ═══════════
 
-        ScanDefinition(name: "Browser Automation Binaries", icon: "cursorarrow.rays", color: .teal,
+        ScanDefinition(name: "Browser Automation Binaries", stableName: "Browser Automation Binaries", icon: "cursorarrow.rays", color: .teal,
             description: "Playwright/Cypress/Puppeteer browser downloads — re-fetched on next install",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/Library/Caches/ms-playwright", "\(home)/Library/Caches/Cypress",
@@ -834,40 +834,40 @@ class CleanupManager {
              "\(home)/.cache/ms-playwright"]
         },
 
-        ScanDefinition(name: "uv / Python Tooling Cache", icon: "puzzlepiece.extension", color: .green,
+        ScanDefinition(name: "uv / Python Tooling Cache", stableName: "uv / Python Tooling Cache", icon: "puzzlepiece.extension", color: .green,
             description: "uv, pre-commit, and pip-tools caches — rebuilt automatically",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/.cache/uv", "\(home)/Library/Caches/uv",
              "\(home)/.cache/pre-commit", "\(home)/Library/Caches/pip-tools"]
         },
 
-        ScanDefinition(name: "Compiler Caches", icon: "hammer.circle", color: .gray,
+        ScanDefinition(name: "Compiler Caches", stableName: "Compiler Caches", icon: "hammer.circle", color: .gray,
             description: "ccache / sccache / zig build caches — rebuilt on next compile",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/.ccache", "\(home)/Library/Caches/sccache",
              "\(home)/.cache/sccache", "\(home)/.cache/zig"]
         },
 
-        ScanDefinition(name: "JS Build Caches", icon: "bolt.horizontal", color: .yellow,
+        ScanDefinition(name: "JS Build Caches", stableName: "JS Build Caches", icon: "bolt.horizontal", color: .yellow,
             description: "Turborepo / Nx build caches — rebuilt on next build",
             group: .packageManagers, safetyLevel: .safe) {
             ["\(home)/.turbo", "\(home)/.nx/cache"]
         },
 
-        ScanDefinition(name: "IaC & Cloud CLI Caches", icon: "cloud", color: .blue,
+        ScanDefinition(name: "IaC & Cloud CLI Caches", stableName: "IaC & Cloud CLI Caches", icon: "cloud", color: .blue,
             description: "Terraform / Helm / kube / AWS / gcloud cache data — rebuilt on demand",
             group: .developer, safetyLevel: .safe) {
             ["\(home)/.terraform.d/plugin-cache", "\(home)/Library/Caches/helm",
              "\(home)/.kube/cache", "\(home)/.aws/cli/cache", "\(home)/.config/gcloud/logs"]
         },
 
-        ScanDefinition(name: "ML / AI Framework Caches", icon: "brain", color: .purple,
+        ScanDefinition(name: "ML / AI Framework Caches", stableName: "ML / AI Framework Caches", icon: "brain", color: .purple,
             description: "PyTorch / Whisper / Keras download caches — re-downloaded when needed",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/.cache/torch", "\(home)/.cache/whisper", "\(home)/.keras/datasets"]
         },
 
-        ScanDefinition(name: "Container / VM Images", icon: "shippingbox", color: .orange,
+        ScanDefinition(name: "Container / VM Images", stableName: "Container / VM Images", icon: "shippingbox", color: .orange,
             description: "Colima / Lima / minikube local VM data — deleting removes local VMs",
             group: .developer, safetyLevel: .review, defaultSelected: false) {
             ["\(home)/.colima", "\(home)/.lima", "\(home)/.minikube/cache"]
@@ -877,6 +877,7 @@ class CleanupManager {
 
         ScanDefinition(
             name: "WhatsApp Chat Media",
+            stableName: "WhatsApp Chat Media",
             icon: "photo.stack.fill",
             color: .green,
             description: "All locally stored WhatsApp attachments — clear this media store to reclaim its full on-disk size",
@@ -892,6 +893,7 @@ class CleanupManager {
 
         ScanDefinition(
             name: "WhatsApp Cache",
+            stableName: "WhatsApp Cache",
             icon: "message.fill",
             color: .green,
             description: "WhatsApp thumbnails, link previews, and generated cache data — rebuilt as needed",
@@ -907,6 +909,7 @@ class CleanupManager {
 
         ScanDefinition(
             name: "WhatsApp Logs",
+            stableName: "WhatsApp Logs",
             icon: "doc.text.magnifyingglass",
             color: .green,
             description: "WhatsApp diagnostic logs — review first if you are troubleshooting the app",
@@ -918,21 +921,21 @@ class CleanupManager {
             ["\(CleanupManager.whatsAppSharedContainerPath)/Logs"]
         },
 
-        ScanDefinition(name: "WeChat Cache", icon: "message", color: .green,
+        ScanDefinition(name: "WeChat Cache", stableName: "WeChat Cache", icon: "message", color: .green,
             description: "WeChat cached data — rebuilt automatically (chat history is not touched)",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["com.tencent.xinWeChat"]) {
             ["\(home)/Library/Containers/com.tencent.xinWeChat/Data/Library/Caches"]
         },
 
-        ScanDefinition(name: "OneDrive Cache", icon: "cloud", color: .blue,
+        ScanDefinition(name: "OneDrive Cache", stableName: "OneDrive Cache", icon: "cloud", color: .blue,
             description: "OneDrive local cache — re-synced from the cloud",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["com.microsoft.OneDrive-mac"]) {
             ["\(home)/Library/Containers/com.microsoft.OneDrive-mac/Data/Library/Caches"]
         },
 
-        ScanDefinition(name: "Dropbox Cache", icon: "cloud", color: .blue,
+        ScanDefinition(name: "Dropbox Cache", stableName: "Dropbox Cache", icon: "cloud", color: .blue,
             description: "Legacy Dropbox cache — review because it can contain pending or recently deleted material",
             group: .applications, safetyLevel: .review, defaultSelected: false) {
             // File Provider storage is globally protected: deleting a placeholder
@@ -941,7 +944,7 @@ class CleanupManager {
             ["\(home)/Dropbox/.dropbox.cache"]
         },
 
-        ScanDefinition(name: "Steam Shader Cache", icon: "gamecontroller", color: .indigo,
+        ScanDefinition(name: "Steam Shader Cache", stableName: "Steam Shader Cache", icon: "gamecontroller", color: .indigo,
             description: "Steam shader and HTTP caches — rebuilt while playing",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["com.valvesoftware.steam"]) {
@@ -949,14 +952,14 @@ class CleanupManager {
              "\(home)/Library/Application Support/Steam/appcache/httpcache"]
         },
 
-        ScanDefinition(name: "Podcasts Cache", icon: "mic", color: .purple,
+        ScanDefinition(name: "Podcasts Cache", stableName: "Podcasts Cache", icon: "mic", color: .purple,
             description: "Apple Podcasts cached episodes — re-downloaded on demand",
             group: .applications, safetyLevel: .review, defaultSelected: false,
             associatedBundleIDs: ["com.apple.podcasts"]) {
             ["\(home)/Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache"]
         },
 
-        ScanDefinition(name: "Music Artwork Cache", icon: "music.note", color: .pink,
+        ScanDefinition(name: "Music Artwork Cache", stableName: "Music Artwork Cache", icon: "music.note", color: .pink,
             description: "Apple Music artwork cache — rebuilt automatically",
             group: .applications, safetyLevel: .safe,
             associatedBundleIDs: ["com.apple.Music"]) {
@@ -1167,7 +1170,7 @@ class CleanupManager {
                     // never inherit deletion permission from another populated root.
                     let measuredPaths = breakdown.map(\.path)
                     let category = CleanupCategory(
-                        name: definition.name, icon: definition.icon,
+                        name: definition.name, stableName: definition.stableName, icon: definition.icon,
                         color: definition.color, description: definition.description,
                         cleanupWarning: definition.cleanupWarning,
                         group: definition.group, safetyLevel: definition.safetyLevel,
@@ -1276,7 +1279,7 @@ class CleanupManager {
             }
             let categorySnapshots = categories.map { category in
                 ScanAuditSnapshot.Category(
-                    name: category.name,
+                    name: category.stableName,
                     group: category.group.rawValue,
                     safetyLevel: category.safetyLevel.rawValue,
                     description: category.description,
@@ -1537,7 +1540,7 @@ class CleanupManager {
                     actualPermanentlyDeletedSize += reclaimedSize
                     DeletionAuditLogger.shared.recordEvent(
                         "docker \(command.joined(separator: " "))",
-                        category: category.name,
+                        category: category.stableName,
                         sessionID: recorder.sessionID,
                         appVersion: Self.appVersionString
                     )
@@ -1574,7 +1577,7 @@ class CleanupManager {
                 for model in outcome.removedModels.sorted() {
                     DeletionAuditLogger.shared.recordEvent(
                         "ollama rm \(model)",
-                        category: category.name,
+                        category: category.stableName,
                         sessionID: recorder.sessionID,
                         appVersion: Self.appVersionString
                     )
@@ -1645,10 +1648,10 @@ class CleanupManager {
 
                     func record(_ removal: FileRemover.Removal) {
                         removals.append(removal)
-                        recorder.record(removal, category: categoryName)
+                        recorder.record(removal, category: category.stableName)
                         DeletionAuditLogger.shared.record(
                             [removal],
-                            category: categoryName,
+                            category: category.stableName,
                             sessionID: recorder.sessionID,
                             appVersion: Self.appVersionString,
                             trashMode: useTrashForCategory
@@ -2225,6 +2228,7 @@ class CleanupManager {
             : (result.hitWatchdog ? String(localized: " · partial scan (safety limit)") : "")
         return CleanupCategory(
             name: String(localized: "Stale Temporary Files"),
+            stableName: "Stale Temporary Files",
             icon: "clock.arrow.circlepath",
             color: .red,
             description: String(localized: "\(paths.count) direct temporary file(s) older than 7 days\(suffix)"),
@@ -2296,7 +2300,7 @@ class CleanupManager {
                 for path in paths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Other App Caches"), icon: "archivebox", color: .blue,
+                    name: String(localized: "Other App Caches"), stableName: "Other App Caches", icon: "archivebox", color: .blue,
                     description: String(localized: "\(paths.count) app caches — safe to remove, rebuilt automatically"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: sorted,
@@ -2359,7 +2363,7 @@ class CleanupManager {
                 for path in paths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Shared Container Caches"), icon: "archivebox.fill", color: .blue,
+                    name: String(localized: "Shared Container Caches"), stableName: "Shared Container Caches", icon: "archivebox.fill", color: .blue,
                     description: String(localized: "\(paths.count) sandboxed-app cache(s) — safe to remove, rebuilt automatically"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: breakdown,
@@ -2395,6 +2399,7 @@ class CleanupManager {
         for path in paths { insertScannedPath(path) }
         return CleanupCategory(
             name: String(localized: "Other Electron App Caches"),
+            stableName: "Other Electron App Caches",
             icon: "bolt.square",
             color: .blue,
             description: String(localized: "\(paths.count) Electron cache directories — rebuilt automatically"),
@@ -2505,7 +2510,7 @@ class CleanupManager {
                 for path in paths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "System Caches"), icon: "internaldrive.fill", color: .blue,
+                    name: String(localized: "System Caches"), stableName: "System Caches", icon: "internaldrive.fill", color: .blue,
                     description: String(localized: "\(paths.count) system-level caches — safe to remove"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: sorted,
@@ -2610,7 +2615,7 @@ class CleanupManager {
                 let totalFileCount = sorted.reduce(0) { $0 + $1.fileCount }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Old Downloads (>\(olderThanDays)d)"), icon: "arrow.down.circle.fill", color: .blue,
+                    name: String(localized: "Old Downloads (>\(olderThanDays)d)"), stableName: "Old Downloads (>\(olderThanDays)d)", icon: "arrow.down.circle.fill", color: .blue,
                     description: String(localized: "\(filePaths.count) old items in Downloads — review before deleting"),
                     group: .system, safetyLevel: .review,
                     paths: filePaths, breakdown: sorted,
@@ -2681,7 +2686,7 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Old Screenshots (>\(olderThanDays)d)"), icon: "camera.viewfinder", color: .teal,
+                    name: String(localized: "Old Screenshots (>\(olderThanDays)d)"), stableName: "Old Screenshots (>\(olderThanDays)d)", icon: "camera.viewfinder", color: .teal,
                     description: String(localized: "\(filePaths.count) old screenshots — likely safe to delete"),
                     group: .system, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
@@ -2783,7 +2788,7 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Old Installers (>\(olderThanDays)d)"), icon: "doc.zipper", color: .brown,
+                    name: String(localized: "Old Installers (>\(olderThanDays)d)"), stableName: "Old Installers (>\(olderThanDays)d)", icon: "doc.zipper", color: .brown,
                     description: String(localized: "\(filePaths.count) old DMG/PKG/MPKG/ISO/XIP or installer ZIP files — review before deleting"),
                     group: .storage, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
@@ -2887,7 +2892,7 @@ class CleanupManager {
         }
 
         return CleanupCategory(
-            name: String(localized: "Unused Apps (>\(thresholdDays)d)"), icon: "app.dashed", color: .gray,
+            name: String(localized: "Unused Apps (>\(thresholdDays)d)"), stableName: "Unused Apps (>\(thresholdDays)d)", icon: "app.dashed", color: .gray,
             description: String(localized: "\(appPaths.count) apps not opened in \(thresholdDays)+ days"),
             group: .applications, safetyLevel: .caution,
             paths: appPaths, allowedRoots: appPaths,
@@ -2987,7 +2992,7 @@ class CleanupManager {
         breakdown.sort { $0.size > $1.size }
 
         return CleanupCategory(
-            name: String(localized: "Docker Dangling Images"), icon: "shippingbox.circle", color: .blue,
+            name: String(localized: "Docker Dangling Images"), stableName: "Docker Dangling Images", icon: "shippingbox.circle", color: .blue,
             description: String(localized: "\(breakdown.count) untagged images not referenced by a container"),
             group: .docker, safetyLevel: .review,
             paths: [], breakdown: breakdown,
@@ -3026,7 +3031,7 @@ class CleanupManager {
         breakdown.sort { $0.size > $1.size }
 
         return CleanupCategory(
-            name: String(localized: "Docker Stopped Containers"), icon: "stop.circle", color: .orange,
+            name: String(localized: "Docker Stopped Containers"), stableName: "Docker Stopped Containers", icon: "stop.circle", color: .orange,
             description: String(localized: "\(breakdown.count) stopped containers"),
             group: .docker, safetyLevel: .safe,
             paths: [], breakdown: breakdown,
@@ -3048,7 +3053,7 @@ class CleanupManager {
                 let reclaimableSize = Self.parseDockerSize(parts[2])
                 guard reclaimableSize > 0 else { return nil }
                 return CleanupCategory(
-                    name: String(localized: "Docker Build Cache"), icon: "hammer.circle", color: .teal,
+                    name: String(localized: "Docker Build Cache"), stableName: "Docker Build Cache", icon: "hammer.circle", color: .teal,
                     description: String(localized: "Build cache — \(parts[2]) reclaimable"),
                     group: .docker, safetyLevel: .safe,
                     paths: [],
@@ -3151,7 +3156,7 @@ class CleanupManager {
             ? String(localized: "1 model installed — \(Self.formatBytes(totalSize))")
             : String(localized: "\(breakdown.count) models installed — \(Self.formatBytes(totalSize))")
         return CleanupCategory(
-            name: String(localized: "Ollama Models"), icon: "brain.head.profile", color: .purple,
+            name: String(localized: "Ollama Models"), stableName: "Ollama Models", icon: "brain.head.profile", color: .purple,
             description: modelDescription,
             group: .developer, safetyLevel: .review,
             paths: [], breakdown: breakdown,
@@ -3227,6 +3232,7 @@ class CleanupManager {
                     : String(localized: "\(found.count) .next build directories — rebuilt by the next Next.js build")
                 continuation.resume(returning: CleanupCategory(
                     name: String(localized: "Next.js Build Artifacts"),
+                    stableName: "Next.js Build Artifacts",
                     icon: "hammer.fill",
                     color: .primary,
                     description: artifactDescription,
@@ -3383,7 +3389,7 @@ class CleanupManager {
                 for path in found { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "node_modules"), icon: "shippingbox.fill", color: .green,
+                    name: String(localized: "node_modules"), stableName: "node_modules", icon: "shippingbox.fill", color: .green,
                     description: String(localized: "\(found.count) node_modules — run npm install to restore"),
                     group: .packageManagers, safetyLevel: .safe,
                     paths: found, breakdown: breakdown,
@@ -3521,7 +3527,7 @@ class CleanupManager {
                     : String(localized: "\(found.count) target directories — run cargo build to restore")
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Rust target directories"), icon: "gearshape.2", color: .orange,
+                    name: String(localized: "Rust target directories"), stableName: "Rust target directories", icon: "gearshape.2", color: .orange,
                     description: targetDescription,
                     group: .packageManagers, safetyLevel: .safe,
                     paths: found, breakdown: breakdown,
@@ -3637,7 +3643,7 @@ class CleanupManager {
                 }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Mail Attachments"), icon: "envelope.badge.shield.half.filled", color: .blue,
+                    name: String(localized: "Mail Attachments"), stableName: "Mail Attachments", icon: "envelope.badge.shield.half.filled", color: .blue,
                     description: String(localized: "Cached mail attachment downloads — re-downloaded from server"),
                     group: .system, safetyLevel: .safe,
                     paths: paths, breakdown: breakdown,
@@ -3795,7 +3801,7 @@ class CleanupManager {
                 for path in orphanPaths { self.insertScannedPath(path) }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "App Leftovers"), icon: "trash.slash", color: .purple,
+                    name: String(localized: "App Leftovers"), stableName: "App Leftovers", icon: "trash.slash", color: .purple,
                     description: String(localized: "\(orphanPaths.count) leftover files from uninstalled apps"),
                     group: .applications, safetyLevel: .review,
                     paths: orphanPaths, breakdown: breakdown,
@@ -3974,7 +3980,7 @@ class CleanupManager {
                 let cappedSize = capped.reduce(0 as Int64) { $0 + $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Large Files (>\(thresholdMB) MB)"), icon: "doc.fill", color: .orange,
+                    name: String(localized: "Large Files (>\(thresholdMB) MB)"), stableName: "Large Files (>\(thresholdMB) MB)", icon: "doc.fill", color: .orange,
                     description: filePaths.count > capped.count
                         ? String(localized: "\(capped.count) largest matches shown of \(filePaths.count) found")
                         : String(localized: "\(capped.count) large files across user directories"),
@@ -4083,7 +4089,7 @@ class CleanupManager {
 
                 breakdown.sort { $0.size > $1.size }
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Virtual Environments"), icon: "terminal", color: .green,
+                    name: String(localized: "Virtual Environments"), stableName: "Virtual Environments", icon: "terminal", color: .green,
                     description: String(localized: "\(filePaths.count) Python/Ruby virtual environments"),
                     group: .packageManagers, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
@@ -4153,7 +4159,7 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "iOS Device Backups"), icon: "iphone", color: .blue,
+                    name: String(localized: "iOS Device Backups"), stableName: "iOS Device Backups", icon: "iphone", color: .blue,
                     description: String(localized: "\(filePaths.count) device backup(s) — review before deleting"),
                     group: .system, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
@@ -4218,7 +4224,7 @@ class CleanupManager {
                 }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "iOS Software Updates"), icon: "arrow.down.app", color: .blue,
+                    name: String(localized: "iOS Software Updates"), stableName: "iOS Software Updates", icon: "arrow.down.app", color: .blue,
                     description: String(localized: "Downloaded firmware files (IPSW) — no longer needed after update"),
                     group: .system, safetyLevel: .safe,
                     paths: filePaths, breakdown: breakdown,
@@ -4252,7 +4258,7 @@ class CleanupManager {
                 }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "iMessage Attachments"), icon: "message.fill", color: .green,
+                    name: String(localized: "iMessage Attachments"), stableName: "iMessage Attachments", icon: "message.fill", color: .green,
                     description: String(localized: "Cached message attachments — deleting creates 'Missing Attachment' placeholders in Messages. May re-download if Messages in iCloud is enabled."),
                     group: .system, safetyLevel: .caution,
                     paths: [attachDir],
@@ -4341,7 +4347,7 @@ class CleanupManager {
                 breakdown.sort { $0.size > $1.size }
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Screen Recordings (>\(thresholdDays)d)"), icon: "record.circle", color: .teal,
+                    name: String(localized: "Screen Recordings (>\(thresholdDays)d)"), stableName: "Screen Recordings (>\(thresholdDays)d)", icon: "record.circle", color: .teal,
                     description: String(localized: "\(filePaths.count) old screen recordings over 50 MB"),
                     group: .storage, safetyLevel: .review,
                     paths: filePaths, breakdown: breakdown,
@@ -4416,7 +4422,7 @@ class CleanupManager {
                         : "")
 
                 continuation.resume(returning: CleanupCategory(
-                    name: String(localized: "Broken Symlinks (\(paths.count) found)"), icon: "link", color: .gray,
+                    name: String(localized: "Broken Symlinks (\(paths.count) found)"), stableName: "Broken Symlinks (\(paths.count) found)", icon: "link", color: .gray,
                     description: String(localized: "Symbolic links pointing to nonexistent targets\(suffix)"),
                     group: .system, safetyLevel: .review,
                     paths: paths, allowedRoots: roots,
@@ -4718,7 +4724,7 @@ class CleanupManager {
             r += String(localized: "DISK USAGE") + "\n"
             r += String(repeating: "─", count: 60) + "\n"
             r += "  " + String(localized: "Total Space:") + " \(Self.formatBytes(disk.totalSpace))\n"
-            r += "  " + String(localized: "Used Space:") + " \(Self.formatBytes(disk.usedSpace)) (\(String(format: "%.1f%%", disk.usedPercentage * 100)))\n"
+            r += "  " + String(localized: "Used Space:") + " \(Self.formatBytes(disk.usedSpace)) (\(disk.usedPercentage.formatted(.percent.precision(.fractionLength(1)))))\n"
             r += "  " + String(localized: "Free Space:") + " \(Self.formatBytes(disk.freeSpace))\n"
             r += "  " + String(localized: "Purgeable:") + " \(Self.formatBytes(disk.purgeableSpace))\n"
             r += "  " + String(localized: "Reclaimable:") + " \(Self.formatBytes(overallSize))\n"

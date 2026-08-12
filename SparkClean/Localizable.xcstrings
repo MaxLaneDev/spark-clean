@@ -1128,40 +1128,6 @@
         }
       }
     },
-    "%@%% used": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@%% בשימוש"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@%% used"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@%%已使用"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@%% 中古"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@%% verwendet"
-          }
-        }
-      }
-    },
     "%@%@ since last check": {
       "localizations": {
         "he": {
@@ -7623,25 +7589,25 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "לחץ על **סרוק** כדי לבצע סריקה מעמיקה של ה-Mac לאיתור מטמונים, קבצים זמניים,\nנתוני יישומים שנותרו, משאבי Docker, יישומים שאינם בשימוש ועוד."
+            "value": "ה‑Mac לא ינקה את עצמו. לחצו על **סרוק** כדי למצוא מטמונים, קבצים זמניים,\nשאריות של יישומים, משאבי Docker, יישומים שלא בשימוש ועוד."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 **扫描** 对 Mac 进行深度扫描，查找缓存、临时文件、\n孤立的应用数据、Docker 资源、未使用的应用等。"
+            "value": "Mac 不会自己收拾。点击 **扫描**，找出缓存、临时文件、\nApp 残留、Docker 资源、长期不用的 App 等内容。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "**スキャン**をクリックして、Mac上のキャッシュ、一時ファイル、\n孤立したアプリデータ、Dockerリソース、未使用のアプリなどを詳しく調べます。"
+            "value": "Macは自分では片付けてくれません。**スキャン**をクリックすると、\nキャッシュ、一時ファイル、アプリの残存データ、Dockerリソースなどを確認できます。"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Klicke auf **Scannen**, um deinen Mac gründlich nach Caches, temporären Dateien,\nverwaisten App-Daten, Docker-Ressourcen, ungenutzten Apps und mehr zu durchsuchen."
+            "value": "Der Mac räumt sich leider nicht selbst auf. Klicke auf **Scannen**, um Caches,\ntemporäre Dateien, App-Reste, Docker-Ressourcen und ungenutzte Apps zu finden."
           }
         }
       }
@@ -8997,7 +8963,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "לוח הבקרה"
+            "value": "סקירה כללית"
           }
         },
         "zh-Hans": {
@@ -9009,7 +8975,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ダッシュボード"
+            "value": "概要"
           }
         },
         "de": {
@@ -9647,19 +9613,19 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "כלי מפתחים"
+            "value": "כלי פיתוח"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开发者工具"
+            "value": "开发工具"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "開発者ツール"
+            "value": "開発ツール"
           }
         },
         "de": {
@@ -9675,25 +9641,25 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "ניקוי כלי מפתחים (Xcode, Android, Gradle)"
+            "value": "ניקוי כלי פיתוח: Xcode, Android ו‑Gradle"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开发人员工具清理（Xcode、Android、Gradle）"
+            "value": "清理开发工具（Xcode、Android、Gradle）"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "開発者ツールのクリーンアップ (Xcode、Android、Gradle)"
+            "value": "開発ツールの整理（Xcode、Android、Gradle）"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereinigung der Entwicklertools (Xcode, Android, Gradle)"
+            "value": "Entwicklerwerkzeuge aufräumen (Xcode, Android, Gradle)"
           }
         }
       }
@@ -9877,7 +9843,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "磁盘空间图"
+            "value": "磁盘地图"
           }
         },
         "ja": {
@@ -10779,13 +10745,13 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "איתור כפילויות"
+            "value": "איתור קבצים כפולים"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重复文件查找"
+            "value": "查找重复文件"
           }
         },
         "ja": {
@@ -12169,19 +12135,19 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "免费"
+            "value": "可用"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "無料"
+            "value": "空き"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kostenlos"
+            "value": "Frei"
           }
         }
       }
@@ -13519,7 +13485,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "线"
+            "value": "LINE"
           }
         },
         "ja": {
@@ -13531,7 +13497,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "LINIE"
+            "value": "LINE"
           }
         }
       }
@@ -14309,25 +14275,25 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "כלי לניקוי האחסון והמטמון ב-Mac"
+            "value": "ניקוי מטמונים ופינוי מקום ב‑Mac"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 存储和缓存清理器"
+            "value": "清理 Mac 储存空间与缓存"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac ストレージとキャッシュ クリーナー"
+            "value": "Macのストレージとキャッシュを整理"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac-Speicher- und Cache-Reiniger"
+            "value": "Speicherplatz und Caches aufräumen"
           }
         }
       }
@@ -14337,25 +14303,25 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "כלי לניקוי אחסון ומטמון ב-Mac.\nסורק מטמונים, קבצים זמניים, משאבי Docker, כלי פיתוח,\nדפדפנים ועוד."
+            "value": "מפנה מקום ב‑Mac.\nסורק מטמונים, קבצים זמניים, משאבי Docker, כלי פיתוח,\nדפדפנים ועוד."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 存储和缓存清理器。\n扫描缓存、临时文件、Docker 资源、\n开发工具、浏览器等等。"
+            "value": "清理 Mac 储存空间。\n扫描缓存、临时文件、Docker 资源、\n开发工具、浏览器等内容。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac ストレージとキャッシュ クリーナー。\nキャッシュ、一時ファイル、Docker リソースをスキャンします。\n開発ツール、ブラウザなど。"
+            "value": "Macの空き容量を取り戻します。\nキャッシュ、一時ファイル、Dockerリソース、\n開発ツール、ブラウザなどをスキャンします。"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac-Speicher- und Cache-Reiniger.\nScannt Caches, temporäre Dateien, Docker-Ressourcen,\nEntwicklungstools, Browser und mehr."
+            "value": "Räumt Speicherplatz auf dem Mac frei.\nScannt Caches, temporäre Dateien, Docker-Ressourcen,\nEntwicklerwerkzeuge, Browser und mehr."
           }
         }
       }
@@ -14365,25 +14331,25 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "כלי לניקוי ולמיטוב האחסון ב-Mac"
+            "value": "ניקוי חכם ופינוי מקום ב‑Mac"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 清理和存储优化器"
+            "value": "清理 Mac，找回储存空间"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac クリーンアップとストレージ オプティマイザー"
+            "value": "Macを整理して、空き容量を取り戻す"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac-Bereinigung und Speicheroptimierung"
+            "value": "Mac aufräumen und Speicherplatz freigeben"
           }
         }
       }
@@ -14881,7 +14847,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Microsoft 团队缓存"
+            "value": "Microsoft Teams 缓存"
           }
         },
         "ja": {
@@ -15469,25 +15435,25 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "תובנות אחסון חדשות - גדלים ומגמות לקריאה בלבד עבור אפליקציות צ'אט, תמונות, דואר, גיבויים של iOS, סימולטורים ו-VMs"
+            "value": "ניתוח אחסון חדש: תצוגה לקריאה בלבד של הגודל והמגמות ביישומי צ'אט, תמונות, דואר, גיבויי iOS, סימולטורים ומכונות וירטואליות"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "新的存储洞察 - 聊天应用程序、照片、邮件、iOS 备份、模拟器和虚拟机的只读大小和趋势"
+            "value": "新增“储存空间分析”：以只读方式查看聊天 App、照片、邮件、iOS 备份、模拟器和虚拟机的大小与变化趋势"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "新しいストレージ インサイト — チャット アプリ、写真、メール、iOS バックアップ、シミュレーター、VM の読み取り専用サイズと傾向"
+            "value": "新しい「ストレージ分析」：チャットアプリ、写真、メール、iOSバックアップ、シミュレータ、仮想マシンの容量と推移を読み取り専用で確認"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Neue Speichereinblicke – schreibgeschützte Größen und Trends für Chat-Apps, Fotos, E-Mails, iOS-Backups, Simulatoren und VMs"
+            "value": "Neue Speicheranalyse: Größen und Trends von Chat-Apps, Fotos, Mail, iOS-Backups, Simulatoren und VMs schreibgeschützt ansehen"
           }
         }
       }
@@ -18261,25 +18227,25 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "מוכן לסריקה"
+            "value": "אפשר להתחיל"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "准备扫描"
+            "value": "可以开始了"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "スキャンの準備ができました"
+            "value": "スキャンの準備完了"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereit zum Scannen"
+            "value": "Bereit für den Scan"
           }
         }
       }
@@ -24395,7 +24361,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "存储空间"
+            "value": "储存空间"
           }
         },
         "ja": {
@@ -24445,13 +24411,13 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "תובנות אחסון"
+            "value": "ניתוח אחסון"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "存储空间分析"
+            "value": "储存空间分析"
           }
         },
         "ja": {
@@ -25029,7 +24995,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Telegramm"
+            "value": "Telegram"
           }
         }
       }
@@ -25085,7 +25051,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Telegrammdaten und Medien"
+            "value": "Telegram-Daten und -Medien"
           }
         }
       }
@@ -26441,7 +26407,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "应用卸载"
+            "value": "卸载应用"
           }
         },
         "ja": {
@@ -26453,7 +26419,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deinstallation"
+            "value": "Apps entfernen"
           }
         }
       }
@@ -26727,19 +26693,19 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "二手"
+            "value": "已用"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "中古品"
+            "value": "使用済み"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gebraucht"
+            "value": "Belegt"
           }
         }
       }
@@ -28528,34 +28494,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS/macOS-Bereitstellungsprofile – erneut vom Entwicklerportal heruntergeladen"
-          }
-        }
-      }
-    },
-    "item no longer exists": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "פריט אינו קיים יותר"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "项目不再存在"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アイテムはもう存在しません"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Element ist nicht mehr vorhanden"
           }
         }
       }

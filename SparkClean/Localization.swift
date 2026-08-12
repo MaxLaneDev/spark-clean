@@ -19,15 +19,22 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var languageCode: String? {
+    /// The language's own name for itself, as shown in the App Language picker.
+    /// Always the endonym (e.g. "Deutsch", not "German") — language names are
+    /// conventionally shown in their own language, not translated.
+    var nativeName: String {
         switch self {
-        case .system: nil
-        case .english: "en"
-        case .simplifiedChinese: "zh-Hans"
-        case .japanese: "ja"
-        case .german: "de"
-        case .hebrew: "he"
+        case .system: String(localized: "System Default")
+        case .english: "English"
+        case .simplifiedChinese: "简体中文"
+        case .japanese: "日本語"
+        case .german: "Deutsch"
+        case .hebrew: "עברית"
         }
+    }
+
+    var languageCode: String? {
+        self == .system ? nil : rawValue
     }
 
     var preferenceValue: [String]? {

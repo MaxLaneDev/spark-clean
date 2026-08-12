@@ -8,8 +8,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **localization**: Complete Simplified Chinese, Japanese, German, and Hebrew translations; Hebrew uses a native right-to-left layout with left-to-right handling for paths and other technical text. Added an in-app language selector with one-click restart and catalog coverage tests (#2).
 
 ### Changed
+- **localization**: Disk-usage percentages (Dashboard, Disk Map) now use locale-aware number formatting instead of a fixed `.` decimal separator, matching the rest of the localized UI.
+- **localization**: The App Language picker is now generated from `AppLanguage` itself instead of a hand-duplicated list, so adding a language only touches one place.
 
 ### Fixed
+- **safety**: The Uninstaller's default-deselect for high-risk related data (VM disks, databases, game libraries, browser profiles) depended on matching English words inside translated description text, so it silently stopped protecting non-English users the moment their category text was translated. It's now driven by an explicit, language-independent flag set per known-app-data entry.
+- **safety**: Deletion audit logs, cleanup manifests, and the scan-snapshot JSON now record a stable, language-independent category identifier instead of the on-screen (localized) category name, so support triage (e.g. grepping logs for a category) no longer breaks when the UI language changes.
+- **localization**: Corrected several catalog entries that translated brand names as ordinary words (LINE, Telegram, Microsoft Teams) in the German and Simplified Chinese catalogs.
+- **localization**: The App Language picker now resyncs to the actually-saved language if persisting a change fails, instead of showing a selection that a restart would not apply.
+- Fixed a duplicate, inconsistently-cased "item no longer exists" string in the deletion gate so the administrator-privileged removal path recognizes an already-deleted item the same way the standard path does.
+- **docs**: Fixed the documentation site's `<base href>` interacting with root-relative links so the stylesheet and language switcher failed to load on every page.
 
 ## [1.4.0] - 2026-07-20
 

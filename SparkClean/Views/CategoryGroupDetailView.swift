@@ -172,7 +172,7 @@ struct CategoryRowView: View {
 
     private var category: CleanupCategory {
         manager.categories.first(where: { $0.id == categoryID }) ?? CleanupCategory(
-            name: "", icon: "questionmark", color: .gray, description: "",
+            name: "", stableName: "", icon: "questionmark", color: .gray, description: "",
             group: .system, safetyLevel: .safe, paths: []
         )
     }
@@ -294,7 +294,7 @@ struct PathBreakdownView: View {
 
     private var category: CleanupCategory {
         manager.categories.first(where: { $0.id == categoryID }) ?? CleanupCategory(
-            name: "", icon: "questionmark", color: .gray, description: "",
+            name: "", stableName: "", icon: "questionmark", color: .gray, description: "",
             group: .system, safetyLevel: .safe, paths: []
         )
     }

@@ -325,7 +325,7 @@ final class FileRemover {
             return String(localized: "blocked by deletion policy")
         }
         guard let isDirectory = existingItemIsDirectory(at: request.path) else {
-            return String(localized: "item no longer exists")
+            return Self.itemNoLongerExistsError
         }
         if let expected = request.expectedIsDirectory, expected != isDirectory {
             return String(localized: "item type changed since it was scanned")

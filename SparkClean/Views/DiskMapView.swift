@@ -31,6 +31,7 @@ struct DiskMapView: View {
                         entrySection(
                             title: String(localized: "Your files"),
                             subtitle: NSHomeDirectory(),
+                            subtitleIsTechnical: true,
                             entries: snapshot.homeRoots,
                             comparisonSize: snapshot.dataVolumeUsedSpace
                         )
@@ -179,7 +180,7 @@ struct DiskMapView: View {
                 Label("Startup APFS container", systemImage: "externaldrive.fill")
                     .font(.headline)
                 Spacer()
-                Text("\(String(format: "%.1f", usedPercentage(snapshot)))% used")
+                Text("\((usedPercentage(snapshot) / 100).formatted(.percent.precision(.fractionLength(1)))) used")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -267,11 +268,12 @@ struct DiskMapView: View {
     private func entrySection(
         title: String,
         subtitle: String,
+        subtitleIsTechnical: Bool = false,
         entries: [DiskMapEntry],
         comparisonSize: Int64
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeading(title, subtitle: subtitle)
+            sectionHeading(title, subtitle: subtitle, subtitleIsTechnical: subtitleIsTechnical)
             if entries.isEmpty {
                 Text("No measurable folders were found.")
                     .font(.caption)
@@ -413,11 +415,13 @@ struct DiskMapView: View {
         )
     }
 
-    private func sectionHeading(_ title: String, subtitle: String) -> some View {
+    private func sectionHeading(
+        _ title: String, subtitle: String, subtitleIsTechnical: Bool = false
+    ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.headline)
-            if subtitle == NSHomeDirectory() {
+            if subtitleIsTechnical {
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -434,7 +438,7 @@ struct DiskMapView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(
                 String(
-                    localized: "Analyzed \(snapshot.generatedAt.formatted(date: .abbreviated, time: .standard)) in \(String(format: "%.1f", snapshot.scanDuration)) seconds."
+                    localized: "Analyzed \(snapshot.generatedAt.formatted(date: .abbreviated, time: .standard)) in \(snapshot.scanDuration.formatted(.number.precision(.fractionLength(1)))) seconds."
                 )
             )
             HStack(spacing: 4) {

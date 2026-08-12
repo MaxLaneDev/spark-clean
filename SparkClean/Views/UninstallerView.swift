@@ -326,23 +326,25 @@ class UninstallerManager {
 
                         if dirSize > 0 {
                             let label = entry.safetyNote.isEmpty ? entry.description : "\(entry.description) \u{26a0}\u{fe0f} \(entry.safetyNote)"
-                            related.append(RelatedPath(path: expandedPath, category: label, size: dirSize, fileCount: dirCount))
+                            related.append(RelatedPath(
+                                path: expandedPath, category: label, size: dirSize,
+                                fileCount: dirCount, isHighRisk: entry.isHighRisk
+                            ))
                         }
                     }
                 }
 
-                // Set default selection: high-confidence items ON, low-confidence OFF
+                // Set default selection: high-confidence items ON, low-confidence OFF.
+                // Risk is read from RelatedPath.isHighRisk (set from KnownAppDataEntry's
+                // stable, language-independent flag) rather than pattern-matched out of
+                // display text — text varies with the user's chosen app language,
+                // category identifiers and isHighRisk do not.
                 let lowConfidenceCategories: Set<String> = [
                     "App Support", "Container", "Group Container",
                 ]
-                let highRiskTerms = [
-                    "⚠", "warning", "data", "configuration", "models", "virtual machine", "vm &",
-                    "games library", "all containers", "database", "android sdk",
-                ]
                 for i in related.indices {
-                    let label = related[i].category.lowercased()
                     let needsReview = lowConfidenceCategories.contains(related[i].category) ||
-                        highRiskTerms.contains { label.contains($0) }
+                        related[i].isHighRisk
                     related[i].isSelected = !needsReview
                 }
 

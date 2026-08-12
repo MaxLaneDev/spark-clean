@@ -19,7 +19,7 @@ struct DiskUsageCardView: View {
                 Label("Disk Usage", systemImage: "internaldrive")
                     .font(.headline)
                 Spacer()
-                Text("\(String(format: "%.1f%%", disk.usedPercentage * 100)) used")
+                Text("\(disk.usedPercentage.formatted(.percent.precision(.fractionLength(1)))) used")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -73,7 +73,7 @@ struct DiskUsageCardView: View {
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Disk usage: \(String(format: "%.1f%%", disk.usedPercentage * 100)) used, \(CleanupManager.formatBytes(disk.freeSpace)) free, \(CleanupManager.formatBytes(reclaimable)) reclaimable")
+        .accessibilityLabel("Disk usage: \(disk.usedPercentage.formatted(.percent.precision(.fractionLength(1)))) used, \(CleanupManager.formatBytes(disk.freeSpace)) free, \(CleanupManager.formatBytes(reclaimable)) reclaimable")
     }
 }
 

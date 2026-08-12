@@ -308,12 +308,9 @@ struct SettingsView: View {
                     Spacer()
 
                     Picker("App Language", selection: $selectedLanguage) {
-                        Text("System Default").tag(AppLanguage.system)
-                        Text(verbatim: "English").tag(AppLanguage.english)
-                        Text(verbatim: "简体中文").tag(AppLanguage.simplifiedChinese)
-                        Text(verbatim: "日本語").tag(AppLanguage.japanese)
-                        Text(verbatim: "Deutsch").tag(AppLanguage.german)
-                        Text(verbatim: "עברית").tag(AppLanguage.hebrew)
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(language.nativeName).tag(language)
+                        }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
@@ -323,6 +320,10 @@ struct SettingsView: View {
                         if AppLocalization.selectLanguage(newValue) {
                             languageChangeNeedsRestart = true
                         } else {
+                            // Persisting the preference failed — resync the picker with
+                            // what's actually saved so it never shows a language that a
+                            // restart would not actually apply.
+                            selectedLanguage = AppLocalization.selectedLanguage
                             languageSaveFailed = true
                         }
                     }

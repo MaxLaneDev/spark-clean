@@ -164,6 +164,12 @@ struct CleanupCategory: Identifiable, Equatable {
 
     let id = UUID()
     let name: String
+    /// A stable, language-independent identifier for this category, distinct from
+    /// the localized `name` shown in the UI. Persisted to deletion audit logs and
+    /// scan-snapshot JSON so cross-session/cross-locale support triage (e.g.
+    /// `grep "Ollama Models" *.log`) works regardless of the app's display language.
+    /// Mirrors the `RelatedPath.category` / `RelatedPath.displayCategory` split.
+    let stableName: String
     let icon: String
     let color: Color
     var description: String
@@ -237,6 +243,9 @@ struct CleanupCategory: Identifiable, Equatable {
 
 struct ScanDefinition {
     let name: String
+    /// Stable, language-independent identifier threaded into `CleanupCategory.stableName`
+    /// for cross-locale support triage in persisted logs/manifests. Never localized.
+    let stableName: String
     let icon: String
     let color: Color
     let description: String
@@ -251,7 +260,7 @@ struct ScanDefinition {
     let defaultSelected: Bool
 
     init(
-        name: String.LocalizationValue, icon: String, color: Color,
+        name: String.LocalizationValue, stableName: String, icon: String, color: Color,
         description: String.LocalizationValue, group: CategoryGroup,
         safetyLevel: SafetyLevel = .safe,
         defaultSelected: Bool = true,
@@ -262,7 +271,7 @@ struct ScanDefinition {
         allowsBreakdownSelection: Bool = true,
         pathResolver: @escaping () -> [String]
     ) {
-        self.name = String(localized: name); self.icon = icon; self.color = color
+        self.name = String(localized: name); self.stableName = stableName; self.icon = icon; self.color = color
         self.description = String(localized: description); self.group = group
         self.cleanupWarning = cleanupWarning.map { String(localized: $0) }
         self.safetyLevel = safetyLevel
@@ -339,6 +348,11 @@ struct RelatedPath: Identifiable {
     let size: Int64
     let fileCount: Int
     let fileIdentity: FileRemover.FileIdentity?
+    /// Whether this location holds data that is costly or impossible to replace
+    /// (databases, VM disks, game libraries, models that must be re-downloaded).
+    /// Set from a stable, language-independent source — never inferred from
+    /// display text, which varies per the user's chosen app language.
+    let isHighRisk: Bool
     var isSelected: Bool = true
 
     var displayCategory: String {
@@ -351,6 +365,7 @@ struct RelatedPath: Identifiable {
         size: Int64,
         fileCount: Int,
         fileIdentity: FileRemover.FileIdentity? = nil,
+        isHighRisk: Bool = false,
         isSelected: Bool = true
     ) {
         self.path = path
@@ -358,6 +373,7 @@ struct RelatedPath: Identifiable {
         self.size = size
         self.fileCount = fileCount
         self.fileIdentity = fileIdentity ?? FileRemover.fileIdentity(at: path)
+        self.isHighRisk = isHighRisk
         self.isSelected = isSelected
     }
 }
@@ -394,15 +410,21 @@ struct KnownAppDataEntry {
     let path: String
     let description: String
     let safetyNote: String
+    /// Costly-or-impossible-to-replace data (databases, VM disks, game libraries,
+    /// models needing re-download) — set explicitly per entry so the Uninstaller's
+    /// default-selection decision never depends on parsing translated display text.
+    let isHighRisk: Bool
 
     init(
         path: String,
         description: String.LocalizationValue,
-        safetyNote: String.LocalizationValue
+        safetyNote: String.LocalizationValue,
+        isHighRisk: Bool
     ) {
         self.path = path
         self.description = String(localized: description)
         self.safetyNote = String(localized: safetyNote)
+        self.isHighRisk = isHighRisk
     }
 }
 
@@ -410,70 +432,70 @@ enum KnownAppData {
     static let paths: [String: [KnownAppDataEntry]] = [
         // AI/ML Apps
         "com.ollama.ollama": [
-            KnownAppDataEntry(path: "~/.ollama", description: "AI Models & Configuration", safetyNote: "Models must be re-downloaded after deletion")
+            KnownAppDataEntry(path: "~/.ollama", description: "AI Models & Configuration", safetyNote: "Models must be re-downloaded after deletion", isHighRisk: true)
         ],
         "com.lmstudio.app": [
-            KnownAppDataEntry(path: "~/.lmstudio", description: "AI Models & Configuration", safetyNote: "Models must be re-downloaded")
+            KnownAppDataEntry(path: "~/.lmstudio", description: "AI Models & Configuration", safetyNote: "Models must be re-downloaded", isHighRisk: true)
         ],
         "com.nomic.gpt4all": [
-            KnownAppDataEntry(path: "~/Library/Application Support/nomic.ai", description: "AI Models", safetyNote: "")
+            KnownAppDataEntry(path: "~/Library/Application Support/nomic.ai", description: "AI Models", safetyNote: "", isHighRisk: true)
         ],
         "com.diffusionbee.diffusionbee": [
-            KnownAppDataEntry(path: "~/.diffusionbee", description: "Stable Diffusion Models", safetyNote: "")
+            KnownAppDataEntry(path: "~/.diffusionbee", description: "Stable Diffusion Models", safetyNote: "", isHighRisk: true)
         ],
         // Virtualization
         "com.docker.docker": [
-            KnownAppDataEntry(path: "~/.docker", description: "Docker CLI Configuration", safetyNote: ""),
-            KnownAppDataEntry(path: "~/Library/Containers/com.docker.docker/Data/vms", description: "Docker VM Disk Image", safetyNote: "Contains all containers and images")
+            KnownAppDataEntry(path: "~/.docker", description: "Docker CLI Configuration", safetyNote: "", isHighRisk: true),
+            KnownAppDataEntry(path: "~/Library/Containers/com.docker.docker/Data/vms", description: "Docker VM Disk Image", safetyNote: "Contains all containers and images", isHighRisk: true)
         ],
         "io.podman.desktop": [
-            KnownAppDataEntry(path: "~/.local/share/containers/podman", description: "Podman VM & Containers", safetyNote: "")
+            KnownAppDataEntry(path: "~/.local/share/containers/podman", description: "Podman VM & Containers", safetyNote: "", isHighRisk: true)
         ],
         "com.utmapp.UTM": [
-            KnownAppDataEntry(path: "~/Library/Containers/com.utmapp.UTM/Data/Documents", description: "Virtual Machines", safetyNote: "VMs will be permanently deleted")
+            KnownAppDataEntry(path: "~/Library/Containers/com.utmapp.UTM/Data/Documents", description: "Virtual Machines", safetyNote: "VMs will be permanently deleted", isHighRisk: true)
         ],
         "com.parallels.desktop.console": [
-            KnownAppDataEntry(path: "~/Parallels", description: "Virtual Machines", safetyNote: "VMs will be permanently deleted")
+            KnownAppDataEntry(path: "~/Parallels", description: "Virtual Machines", safetyNote: "VMs will be permanently deleted", isHighRisk: true)
         ],
         // Development
         "com.google.android.studio": [
-            KnownAppDataEntry(path: "~/.android/avd", description: "Android Virtual Devices", safetyNote: ""),
-            KnownAppDataEntry(path: "~/Library/Android/sdk", description: "Android SDK", safetyNote: "Must re-download if needed")
+            KnownAppDataEntry(path: "~/.android/avd", description: "Android Virtual Devices", safetyNote: "", isHighRisk: false),
+            KnownAppDataEntry(path: "~/Library/Android/sdk", description: "Android SDK", safetyNote: "Must re-download if needed", isHighRisk: true)
         ],
         // Databases
         "com.postgresapp.Postgres2": [
-            KnownAppDataEntry(path: "/opt/homebrew/var/postgres", description: "PostgreSQL Data", safetyNote: "WARNING: Contains all databases"),
-            KnownAppDataEntry(path: "/usr/local/var/postgres", description: "PostgreSQL Data (Intel)", safetyNote: "WARNING: Contains all databases")
+            KnownAppDataEntry(path: "/opt/homebrew/var/postgres", description: "PostgreSQL Data", safetyNote: "WARNING: Contains all databases", isHighRisk: true),
+            KnownAppDataEntry(path: "/usr/local/var/postgres", description: "PostgreSQL Data (Intel)", safetyNote: "WARNING: Contains all databases", isHighRisk: true)
         ],
         // Media
         "com.adobe.PremierePro": [
-            KnownAppDataEntry(path: "~/Library/Application Support/Adobe/Common/Media Cache Files", description: "Adobe Media Cache", safetyNote: "Shared across Adobe apps")
+            KnownAppDataEntry(path: "~/Library/Application Support/Adobe/Common/Media Cache Files", description: "Adobe Media Cache", safetyNote: "Shared across Adobe apps", isHighRisk: false)
         ],
         // Communication
         "ru.keepcoder.Telegram": [
-            KnownAppDataEntry(path: "~/Library/Group Containers/6N38VVP8K2.telegram", description: "Telegram Data & Media", safetyNote: "")
+            KnownAppDataEntry(path: "~/Library/Group Containers/6N38VVP8K2.telegram", description: "Telegram Data & Media", safetyNote: "", isHighRisk: true)
         ],
         "com.tinyspeck.slackmacgap": [
-            KnownAppDataEntry(path: "~/Library/Application Support/Slack/Cache", description: "Slack Media Cache", safetyNote: ""),
-            KnownAppDataEntry(path: "~/Library/Application Support/Slack/Service Worker", description: "Slack Service Workers", safetyNote: "")
+            KnownAppDataEntry(path: "~/Library/Application Support/Slack/Cache", description: "Slack Media Cache", safetyNote: "", isHighRisk: false),
+            KnownAppDataEntry(path: "~/Library/Application Support/Slack/Service Worker", description: "Slack Service Workers", safetyNote: "", isHighRisk: false)
         ],
         // Gaming
         "com.valvesoftware.steam": [
-            KnownAppDataEntry(path: "~/Library/Application Support/Steam/steamapps", description: "Steam Games Library", safetyNote: "All installed games will be deleted")
+            KnownAppDataEntry(path: "~/Library/Application Support/Steam/steamapps", description: "Steam Games Library", safetyNote: "All installed games will be deleted", isHighRisk: true)
         ],
         "com.epicgames.EpicGamesLauncher": [
-            KnownAppDataEntry(path: "/Users/Shared/Epic Games", description: "Epic Games Library", safetyNote: "All installed games will be deleted")
+            KnownAppDataEntry(path: "/Users/Shared/Epic Games", description: "Epic Games Library", safetyNote: "All installed games will be deleted", isHighRisk: true)
         ],
         // Cloud Storage
         "com.google.drivefs": [
-            KnownAppDataEntry(path: "~/Library/Application Support/Google/DriveFS", description: "Google Drive Cache", safetyNote: "Local cache only — cloud files safe")
+            KnownAppDataEntry(path: "~/Library/Application Support/Google/DriveFS", description: "Google Drive Cache", safetyNote: "Local cache only — cloud files safe", isHighRisk: false)
         ],
         // Browsers
         "com.google.Chrome": [
-            KnownAppDataEntry(path: "~/Library/Application Support/Google/Chrome", description: "Chrome Profiles & Extensions", safetyNote: "All bookmarks, history, extensions")
+            KnownAppDataEntry(path: "~/Library/Application Support/Google/Chrome", description: "Chrome Profiles & Extensions", safetyNote: "All bookmarks, history, extensions", isHighRisk: true)
         ],
         "org.mozilla.firefox": [
-            KnownAppDataEntry(path: "~/Library/Application Support/Firefox/Profiles", description: "Firefox Profiles", safetyNote: "All bookmarks, history, extensions")
+            KnownAppDataEntry(path: "~/Library/Application Support/Firefox/Profiles", description: "Firefox Profiles", safetyNote: "All bookmarks, history, extensions", isHighRisk: true)
         ],
     ]
 }

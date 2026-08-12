@@ -300,6 +300,7 @@ struct CleanupManagerLogicTests {
         let root = "/Users/test/Library/Group Containers/example/Message/Media"
         let category = CleanupCategory(
             name: "WhatsApp Chat Media",
+            stableName: "WhatsApp Chat Media",
             icon: "photo.stack.fill",
             color: .green,
             description: "Media",
@@ -394,7 +395,7 @@ struct CleanupManagerLogicTests {
         selected: Bool = true
     ) -> CleanupCategory {
         CleanupCategory(
-            name: name, icon: "folder", color: .blue,
+            name: name, stableName: name, icon: "folder", color: .blue,
             description: "Test", group: group, safetyLevel: safetyLevel,
             paths: [], size: size, isSelected: selected
         )
@@ -461,6 +462,7 @@ struct ModelTests {
     @Test func zeroByteReviewItemsRemainCleanable() {
         let category = CleanupCategory(
             name: "Broken Links",
+            stableName: "Broken Links",
             icon: "link",
             color: .gray,
             description: "Test",
@@ -475,6 +477,7 @@ struct ModelTests {
     @Test func dockerPruneUsesCategoryLevelSelection() {
         let category = CleanupCategory(
             name: "Docker Dangling Images",
+            stableName: "Docker Dangling Images",
             icon: "shippingbox",
             color: .blue,
             description: "Test",
@@ -490,6 +493,7 @@ struct ModelTests {
     @Test func ollamaModelsSupportPerModelSelection() {
         let category = CleanupCategory(
             name: "Ollama Models",
+            stableName: "Ollama Models",
             icon: "brain",
             color: .purple,
             description: "Test",
