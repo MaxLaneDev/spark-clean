@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 ### Added
 
 ### Changed
+- **readme**: The README hero now links to the SparkClean demo video on YouTube instead of a static dashboard screenshot.
 
 ### Fixed
 

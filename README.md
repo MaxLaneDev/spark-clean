@@ -23,7 +23,12 @@ educational, academic, and other non-commercial use under the included
 [license](LICENSE).
 
 <p align="center">
-  <img width="1100" src="screenshots/dashboard.png" alt="SparkClean dashboard after a cleanup scan">
+  <a href="https://youtu.be/82pBcFR8ODI">
+    <img width="1100" src="https://img.youtube.com/vi/82pBcFR8ODI/maxresdefault.jpg" alt="Watch the SparkClean quick demo on YouTube">
+  </a>
+</p>
+<p align="center">
+  <a href="https://youtu.be/82pBcFR8ODI"><strong>▶ Watch SparkClean in action on YouTube</strong></a>
 </p>
 
 ## Quick Start
