@@ -51,7 +51,7 @@ struct StorageInsightsView: View {
                     Task { await manager.measure(today: StorageInsightsManager.todayString(Date())) }
                 }
             } label: {
-                PrimaryActionLabel(
+                ToolbarActionLabel(
                     title: manager.isMeasuring ? String(localized: "Cancel") : String(localized: "Refresh"),
                     systemImage: manager.isMeasuring ? "xmark.circle" : "arrow.clockwise"
                 )
@@ -156,7 +156,7 @@ struct StorageInsightsView: View {
                     Button {
                         onReviewWhatsAppCleanup()
                     } label: {
-                        PrimaryActionLabel(title: String(localized: "Review & Clear"), systemImage: "trash")
+                        ToolbarActionLabel(title: String(localized: "Review & Clear"), systemImage: "trash")
                     }
                     .platformPrimaryActionStyle(tint: .red)
                     .controlSize(.regular)

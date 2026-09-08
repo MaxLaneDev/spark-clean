@@ -52,20 +52,24 @@ struct CategoryGroupDetailView: View {
                     Button {
                         Task { await manager.scan(onlyGroup: group) }
                     } label: {
-                        PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
+                        ToolbarActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                     }
                     .platformPrimaryActionStyle(tint: .blue)
                     .controlSize(.regular)
                     .disabled(manager.isScanning)
 
                     if !groupCategories.isEmpty {
-                        Button("Select All") { manager.selectAll(in: group) }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                        Button { manager.selectAll(in: group) } label: {
+                            ToolbarActionLabel(title: String(localized: "Select All"), systemImage: "checkmark.circle")
+                        }
+                        .platformSecondaryActionStyle()
+                        .controlSize(.regular)
 
-                        Button("Deselect All") { manager.deselectAll(in: group) }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                        Button { manager.deselectAll(in: group) } label: {
+                            ToolbarActionLabel(title: String(localized: "Deselect All"), systemImage: "xmark.circle")
+                        }
+                        .platformSecondaryActionStyle()
+                        .controlSize(.regular)
                     }
                 }
             }
@@ -143,7 +147,7 @@ struct CategoryGroupDetailView: View {
                         manager.pendingCleanGroup = group
                         showCleanAlert = true
                     } label: {
-                        PrimaryActionLabel(title: String(localized: "Clean Selected"), systemImage: "trash")
+                        ToolbarActionLabel(title: String(localized: "Clean Selected"), systemImage: "trash")
                     }
                     .platformPrimaryActionStyle(tint: .red)
                     .controlSize(.regular)

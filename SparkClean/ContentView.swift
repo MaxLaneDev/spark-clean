@@ -383,6 +383,25 @@ struct ContentView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 34, for: .scrollContent)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .frame(height: 48)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black.opacity(0.9), location: 0.55),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .allowsHitTesting(false)
+        }
 
         // Scan progress
         if manager.isScanning {
@@ -440,21 +459,18 @@ struct ContentView: View {
                 Text("Some scans need Full Disk Access to find all files.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Button("Grant Access") {
+                Button {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
                         NSWorkspace.shared.open(url)
                     }
+                } label: {
+                    PrimaryActionLabel(title: String(localized: "Grant Access"), systemImage: "lock.open")
                 }
-                .font(.caption2)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .platformSecondaryActionStyle()
+                .controlSize(.regular)
             }
             .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.orange.opacity(0.08))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange.opacity(0.2), lineWidth: 1))
-            )
+            .platformWarningSurface()
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
         }
@@ -545,7 +561,7 @@ struct DashboardView: View {
 
             if manager.isScanning {
                 Button { manager.cancelScan() } label: {
-                    PrimaryActionLabel(title: String(localized: "Cancel"), systemImage: "xmark")
+                    ToolbarActionLabel(title: String(localized: "Cancel"), systemImage: "xmark")
                 }
                 .platformPrimaryActionStyle(tint: .orange)
                 .controlSize(.regular)
@@ -556,7 +572,7 @@ struct DashboardView: View {
                     manager.pendingCleanGroup = nil
                     showCleanAlert = true
                 } label: {
-                    PrimaryActionLabel(
+                    ToolbarActionLabel(
                         title: manager.isCleaning ? String(localized: "Cleaning...") : String(localized: "Clean"),
                         systemImage: "trash"
                     )
@@ -569,7 +585,7 @@ struct DashboardView: View {
             Button {
                 Task { await manager.scan() }
             } label: {
-                PrimaryActionLabel(
+                ToolbarActionLabel(
                     title:
                         manager.isScanning
                             ? String(localized: "Scanning...")

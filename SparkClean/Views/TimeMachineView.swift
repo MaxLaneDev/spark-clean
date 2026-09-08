@@ -83,7 +83,7 @@ struct TimeMachineView: View {
                 selected.removeAll()
                 Task { await manager.refresh() }
             } label: {
-                PrimaryActionLabel(title: String(localized: "Refresh"), systemImage: "arrow.clockwise")
+                ToolbarActionLabel(title: String(localized: "Refresh"), systemImage: "arrow.clockwise")
             }
             .platformPrimaryActionStyle(tint: .blue)
             .controlSize(.regular)
@@ -143,14 +143,20 @@ struct TimeMachineView: View {
 
     private var footer: some View {
         HStack {
-            Button("Select All Older") {
+            Button {
                 selected = Set(deletableSnapshots.map(\.id))
+            } label: {
+                ToolbarActionLabel(title: String(localized: "Select All"), systemImage: "checkmark.circle")
             }
-            .buttonStyle(.bordered).controlSize(.small)
+            .platformSecondaryActionStyle()
+            .controlSize(.regular)
             .disabled(deletableSnapshots.isEmpty)
 
-            Button("Deselect All") { selected.removeAll() }
-                .buttonStyle(.bordered).controlSize(.small)
+            Button { selected.removeAll() } label: {
+                ToolbarActionLabel(title: String(localized: "Deselect All"), systemImage: "xmark.circle")
+            }
+                .platformSecondaryActionStyle()
+                .controlSize(.regular)
                 .disabled(selected.isEmpty)
 
             Spacer()
@@ -158,7 +164,7 @@ struct TimeMachineView: View {
             Button {
                 showConfirm = true
             } label: {
-                PrimaryActionLabel(title: String(localized: "Delete Selected"), systemImage: "trash")
+                ToolbarActionLabel(title: String(localized: "Delete Selected"), systemImage: "trash")
             }
             .platformPrimaryActionStyle(tint: .red)
             .controlSize(.regular)

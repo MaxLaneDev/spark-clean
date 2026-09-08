@@ -317,7 +317,7 @@ struct MaintenanceView: View {
                 Button {
                     showRunConfirmation = true
                 } label: {
-                    PrimaryActionLabel(title: String(localized: "Run Selected"), systemImage: "play.fill")
+                    ToolbarActionLabel(title: String(localized: "Run Selected"), systemImage: "play.fill")
                 }
                 .platformPrimaryActionStyle(tint: .blue)
                 .controlSize(.regular)

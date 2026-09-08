@@ -743,7 +743,7 @@ struct DuplicateFinderView: View {
                     manager.scanDuplicates()
                 }
             } label: {
-                PrimaryActionLabel(
+                ToolbarActionLabel(
                     title:
                         manager.isScanning
                             ? String(localized: "Cancel")
@@ -900,7 +900,7 @@ struct DuplicateFinderView: View {
             Button {
                 showCleanAlert = true
             } label: {
-                PrimaryActionLabel(
+                ToolbarActionLabel(
                     title: isCleaning ? String(localized: "Cleaning...") : String(localized: "Clean Selected"),
                     systemImage: isCleaning ? "arrow.triangle.2.circlepath" : "trash"
                 )

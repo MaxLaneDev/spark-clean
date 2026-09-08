@@ -98,7 +98,7 @@ struct DiskMapView: View {
                     Task { await manager.scan() }
                 }
             } label: {
-                PrimaryActionLabel(
+                ToolbarActionLabel(
                     title: manager.isScanning ? String(localized: "Cancel") : String(localized: "Scan"),
                     systemImage: manager.isScanning ? "xmark.circle" : "magnifyingglass"
                 )

@@ -276,10 +276,15 @@ struct StartupManagerView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 14) {
+                Image(systemName: "bolt.circle")
+                    .font(.title2)
+                    .foregroundStyle(.yellow)
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Startup Items")
-                        .font(.title2.bold())
+                        .font(.title3)
+                        .fontWeight(.bold)
                     Text("\(manager.items.count) items found across Launch Agents and Daemons")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -298,14 +303,15 @@ struct StartupManagerView: View {
                 Button {
                     manager.scan()
                 } label: {
-                    PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
+                    ToolbarActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                 }
                 .help("Rescan startup items")
                 .platformPrimaryActionStyle(tint: .blue)
                 .controlSize(.regular)
                 .disabled(manager.isScanning)
             }
-            .padding()
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
             .platformHeaderSurface()
 
             Divider()
@@ -351,6 +357,7 @@ struct StartupManagerView: View {
                 }
             }
         }
+        .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             if manager.items.isEmpty {
                 manager.scan()

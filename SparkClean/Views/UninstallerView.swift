@@ -902,7 +902,7 @@ struct UninstallerView: View {
                 selectedApp = nil
                 Task { await uninstaller.scanApps() }
             } label: {
-                PrimaryActionLabel(
+                ToolbarActionLabel(
                     title:
                         uninstaller.isScanning
                             ? String(localized: "Scanning...")
@@ -1124,7 +1124,7 @@ struct UninstallerView: View {
                         } ?? app
                         showUninstallAlert = true
                     } label: {
-                        PrimaryActionLabel(
+                        ToolbarActionLabel(
                             title: isUninstalling ? String(localized: "Uninstalling...") : String(localized: "Uninstall"),
                             systemImage: isUninstalling ? "arrow.triangle.2.circlepath" : "trash"
                         )

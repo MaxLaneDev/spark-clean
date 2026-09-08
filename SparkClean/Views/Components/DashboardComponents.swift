@@ -20,6 +20,19 @@ struct PrimaryActionLabel: View {
     }
 }
 
+struct ToolbarActionLabel: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: 92, height: 28)
+    }
+}
+
 extension View {
     @ViewBuilder
     func platformPrimaryActionStyle(tint: Color) -> some View {
@@ -29,6 +42,15 @@ extension View {
         } else {
             buttonStyle(.borderedProminent)
                 .tint(tint)
+        }
+    }
+
+    @ViewBuilder
+    func platformSecondaryActionStyle() -> some View {
+        if #available(macOS 26.0, *) {
+            buttonStyle(.glass)
+        } else {
+            buttonStyle(.bordered)
         }
     }
 
@@ -48,6 +70,25 @@ extension View {
                 .buttonStyle(.glass)
         } else {
             menuStyle(.borderlessButton)
+        }
+    }
+
+    @ViewBuilder
+    func platformWarningSurface() -> some View {
+        if #available(macOS 26.0, *) {
+            glassEffect(
+                .regular.tint(.orange.opacity(0.12)),
+                in: RoundedRectangle(cornerRadius: 10)
+            )
+        } else {
+            background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.orange.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                    )
+            )
         }
     }
 }
