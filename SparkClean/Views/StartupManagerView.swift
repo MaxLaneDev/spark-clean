@@ -276,21 +276,22 @@ struct StartupManagerView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack(spacing: 14) {
-                Image(systemName: "bolt.circle")
-                    .font(.title2)
-                    .foregroundStyle(.yellow)
+            AdaptiveHeader {
+                HStack(spacing: 14) {
+                    Image(systemName: "bolt.circle")
+                        .font(.title2)
+                        .foregroundStyle(.yellow)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Startup Items")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                    Text("\(manager.items.count) items found across Launch Agents and Daemons")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Startup Items")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                        Text("\(manager.items.count) items found across Launch Agents and Daemons")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                Spacer()
-
+            } actions: {
                 Picker("Filter", selection: $filter) {
                     Text("All").tag(nil as StartupItem.ItemType?)
                     Text("User Agents").tag(StartupItem.ItemType.userAgent as StartupItem.ItemType?)
@@ -311,7 +312,7 @@ struct StartupManagerView: View {
                 .disabled(manager.isScanning)
             }
             .padding(.horizontal, 24)
-            .frame(height: 64)
+            .padding(.vertical, 16)
             .platformHeaderSurface()
 
             Divider()

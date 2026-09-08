@@ -35,15 +35,17 @@ struct StorageInsightsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "chart.bar.doc.horizontal")
-                .font(.title2).foregroundStyle(.teal)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Storage Insights").font(.title3).fontWeight(.bold)
-                Text("\(CleanupManager.formatBytes(totalWatched)) across \(manager.items.filter { $0.size > 0 }.count) watched stores")
-                    .font(.caption).foregroundStyle(.secondary)
+        AdaptiveHeader {
+            HStack(spacing: 14) {
+                Image(systemName: "chart.bar.doc.horizontal")
+                    .font(.title2).foregroundStyle(.teal)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Storage Insights").font(.title3).fontWeight(.bold)
+                    Text("\(CleanupManager.formatBytes(totalWatched)) across \(manager.items.filter { $0.size > 0 }.count) watched stores")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
-            Spacer()
+        } actions: {
             Button {
                 if manager.isMeasuring {
                     manager.cancelMeasurement()

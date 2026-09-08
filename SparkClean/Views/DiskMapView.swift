@@ -68,29 +68,31 @@ struct DiskMapView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "internaldrive.fill")
-                .font(.title2)
-                .foregroundStyle(.indigo)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Disk Map")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                if let snapshot = manager.snapshot {
-                    Text(
-                        String(
-                            localized: "\(CleanupManager.formatBytes(snapshot.containerUsedSpace)) used of \(CleanupManager.formatBytes(snapshot.containerTotalSpace))"
+        AdaptiveHeader {
+            HStack(spacing: 14) {
+                Image(systemName: "internaldrive.fill")
+                    .font(.title2)
+                    .foregroundStyle(.indigo)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Disk Map")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    if let snapshot = manager.snapshot {
+                        Text(
+                            String(
+                                localized: "\(CleanupManager.formatBytes(snapshot.containerUsedSpace)) used of \(CleanupManager.formatBytes(snapshot.containerTotalSpace))"
+                            )
                         )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } else {
-                    Text("See where all startup-disk space is allocated")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    } else {
+                        Text("See where all startup-disk space is allocated")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-            Spacer()
+        } actions: {
             Button {
                 if manager.isScanning {
                     manager.cancel()

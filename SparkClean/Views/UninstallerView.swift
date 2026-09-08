@@ -872,24 +872,24 @@ struct UninstallerView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "trash.square")
-                .font(.title2)
-                .foregroundStyle(.red)
+        AdaptiveHeader {
+            HStack(spacing: 14) {
+                Image(systemName: "trash.square")
+                    .font(.title2)
+                    .foregroundStyle(.red)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("App Uninstaller")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                if uninstaller.scanComplete {
-                    Text("\(uninstaller.apps.count) apps found")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("App Uninstaller")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    if uninstaller.scanComplete {
+                        Text("\(uninstaller.apps.count) apps found")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-
-            Spacer()
-
+        } actions: {
             if uninstaller.scanComplete {
                 // Search
                 TextField("Search apps...", text: $uninstaller.searchQuery)

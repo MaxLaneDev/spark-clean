@@ -68,17 +68,19 @@ struct TimeMachineView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "clock.arrow.2.circlepath")
-                .font(.title2)
-                .foregroundStyle(.purple)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Time Machine")
-                    .font(.title3).fontWeight(.bold)
-                Text("\(manager.snapshots.count) local snapshot(s) on this disk")
-                    .font(.caption).foregroundStyle(.secondary)
+        AdaptiveHeader {
+            HStack(spacing: 14) {
+                Image(systemName: "clock.arrow.2.circlepath")
+                    .font(.title2)
+                    .foregroundStyle(.purple)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Time Machine")
+                        .font(.title3).fontWeight(.bold)
+                    Text("\(manager.snapshots.count) local snapshot(s) on this disk")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
-            Spacer()
+        } actions: {
             Button {
                 selected.removeAll()
                 Task { await manager.refresh() }

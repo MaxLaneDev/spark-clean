@@ -535,30 +535,30 @@ struct DashboardView: View {
     // MARK: Header
 
     private var headerSection: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "sparkles")
-                .font(.title2)
-                .foregroundStyle(
-                    LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
+        AdaptiveHeader {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(
+                        LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("SparkClean")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                if manager.scanComplete {
-                    Text("\(manager.categories.count) categories · \(CleanupManager.formatBytes(manager.overallSize)) reclaimable")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Mac cleanup & storage optimizer")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("SparkClean")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    if manager.scanComplete {
+                        Text("\(manager.categories.count) categories · \(CleanupManager.formatBytes(manager.overallSize)) reclaimable")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Mac cleanup & storage optimizer")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-
-            Spacer()
-
+        } actions: {
             if manager.isScanning {
                 Button { manager.cancelScan() } label: {
                     ToolbarActionLabel(title: String(localized: "Cancel"), systemImage: "xmark")

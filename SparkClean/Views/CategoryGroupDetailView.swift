@@ -32,22 +32,22 @@ struct CategoryGroupDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                Image(systemName: group.icon)
-                    .font(.title2)
-                    .foregroundStyle(group.color)
+            AdaptiveHeader {
+                HStack(spacing: 14) {
+                    Image(systemName: group.icon)
+                        .font(.title2)
+                        .foregroundStyle(group.color)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(group.displayName)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                    Text("\(groupCategories.count) categories · \(CleanupManager.formatBytes(groupSize)) total")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.displayName)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                        Text("\(groupCategories.count) categories · \(CleanupManager.formatBytes(groupSize)) total")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-
-                Spacer()
-
+            } actions: {
                 HStack(spacing: 8) {
                     Button {
                         Task { await manager.scan(onlyGroup: group) }

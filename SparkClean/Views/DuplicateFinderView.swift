@@ -712,24 +712,24 @@ struct DuplicateFinderView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "doc.on.doc")
-                .font(.title2)
-                .foregroundStyle(.teal)
+        AdaptiveHeader {
+            HStack(spacing: 14) {
+                Image(systemName: "doc.on.doc")
+                    .font(.title2)
+                    .foregroundStyle(.teal)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Duplicate Finder")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                if manager.scanComplete {
-                    Text("\(manager.duplicateGroups.count) groups found, \(CleanupManager.formatBytes(manager.totalWastedSpace)) wasted · \(manager.scanStats)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Duplicate Finder")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    if manager.scanComplete {
+                        Text("\(manager.duplicateGroups.count) groups found, \(CleanupManager.formatBytes(manager.totalWastedSpace)) wasted · \(manager.scanStats)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-
-            Spacer()
-
+        } actions: {
             if manager.scanComplete {
                 TextField("Search duplicates...", text: $manager.searchQuery)
                     .textFieldStyle(.roundedBorder)

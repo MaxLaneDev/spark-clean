@@ -7,6 +7,38 @@
 
 import SwiftUI
 
+struct AdaptiveHeader<Leading: View, Actions: View>: View {
+    let leading: Leading
+    let actions: Actions
+
+    init(
+        @ViewBuilder leading: () -> Leading,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.leading = leading()
+        self.actions = actions()
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) {
+                leading.fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 0)
+                HStack(spacing: 8) { actions }
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                leading
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    actions
+                }
+            }
+        }
+    }
+}
+
 struct PrimaryActionLabel: View {
     let title: String
     let systemImage: String

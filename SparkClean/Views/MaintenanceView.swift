@@ -297,7 +297,7 @@ struct MaintenanceView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            AdaptiveHeader {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("System Maintenance")
                         .font(.title2.bold())
@@ -305,8 +305,7 @@ struct MaintenanceView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
-
+            } actions: {
                 if manager.tasks.contains(where: { $0.status != .idle }) {
                     Button("Reset") {
                         manager.resetAll()
