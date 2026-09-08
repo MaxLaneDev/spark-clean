@@ -76,10 +76,16 @@ extension View {
     @ViewBuilder
     func platformWarningSurface() -> some View {
         if #available(macOS 26.0, *) {
-            glassEffect(
-                .regular.tint(.orange.opacity(0.12)),
-                in: RoundedRectangle(cornerRadius: 10)
-            )
+            GlassEffectContainer(spacing: 8) {
+                background(
+                    Color.orange.opacity(0.04),
+                    in: RoundedRectangle(cornerRadius: 10)
+                )
+                .glassEffect(
+                    .regular.tint(.orange.opacity(0.18)),
+                    in: RoundedRectangle(cornerRadius: 10)
+                )
+            }
         } else {
             background(
                 RoundedRectangle(cornerRadius: 10)
