@@ -311,7 +311,7 @@ struct StartupManagerView: View {
                 .disabled(manager.isScanning)
             }
             .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+            .frame(height: 64)
             .platformHeaderSurface()
 
             Divider()
