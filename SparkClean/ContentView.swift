@@ -115,6 +115,7 @@ struct ContentView: View {
                 detailPane
             }
         }
+        .scrollIndicators(.hidden)
         // Clean confirmation with safety breakdown
         .sheet(isPresented: $showCleanAlert) {
             CleanConfirmationSheet(manager: manager, isPresented: $showCleanAlert) {
