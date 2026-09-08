@@ -46,16 +46,7 @@ struct ContentView: View {
             SidebarMaterialBackground()
                 .ignoresSafeArea(.container, edges: .top)
         }
-        .overlay(alignment: .top) {
-            LinearGradient(
-                colors: [.black.opacity(0.18), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 40)
-            .ignoresSafeArea(.container, edges: .top)
-            .allowsHitTesting(false)
-        }
+        .coordinateSpace(name: "sidebarPane")
         .accessibilityIdentifier("mainSidebar")
     }
 
@@ -395,7 +386,7 @@ struct ContentView: View {
                 }
             }
             .padding(.horizontal, 8)
-            .padding(.top, 18)
+            .padding(.top, 8)
             .padding(.bottom, 8)
         }
 
@@ -480,6 +471,7 @@ struct ContentView: View {
             .padding(.horizontal, 8)
             .padding(.top, 12)
             .padding(.bottom, 4)
+            .sidebarScrollBlur()
     }
 }
 

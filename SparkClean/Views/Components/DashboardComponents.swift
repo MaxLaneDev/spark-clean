@@ -489,5 +489,37 @@ struct SidebarRow: View {
                 .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
                 .animation(.easeInOut(duration: 0.15), value: isSelected)
         )
+        .sidebarScrollBlur()
+    }
+}
+
+struct SidebarScrollBlurModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+        } else {
+            content.visualEffect { effect, geometry in
+                effect.blur(radius: SidebarScrollBlur.radius(
+                    for: geometry.frame(in: .named("sidebarPane")).minY
+                ))
+            }
+        }
+    }
+}
+
+enum SidebarScrollBlur {
+    nonisolated static func radius(
+        for minY: CGFloat,
+        macOSMajorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+    ) -> CGFloat {
+        guard macOSMajorVersion < 26 else { return 0 }
+        return min(10, max(0, -minY / 2))
+    }
+}
+
+extension View {
+    func sidebarScrollBlur() -> some View {
+        modifier(SidebarScrollBlurModifier())
     }
 }

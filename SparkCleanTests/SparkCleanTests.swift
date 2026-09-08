@@ -27,6 +27,22 @@ struct PermanentDeletionConfirmationTests {
     }
 }
 
+struct SidebarScrollBlurTests {
+    @Test func dashboardIsSharpAtRest() {
+        #expect(SidebarScrollBlur.radius(for: 8, macOSMajorVersion: 15) == 0)
+        #expect(SidebarScrollBlur.radius(for: 0, macOSMajorVersion: 15) == 0)
+    }
+
+    @Test func blurStartsOnlyAfterScrollingUnderWindowControls() {
+        #expect(SidebarScrollBlur.radius(for: -4, macOSMajorVersion: 15) == 2)
+        #expect(SidebarScrollBlur.radius(for: -40, macOSMajorVersion: 15) == 10)
+    }
+
+    @Test func macOS26KeepsNativeAppearance() {
+        #expect(SidebarScrollBlur.radius(for: -40, macOSMajorVersion: 26) == 0)
+    }
+}
+
 // MARK: - Localization Tests
 
 struct LocalizationTests {
