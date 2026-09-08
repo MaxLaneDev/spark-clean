@@ -47,6 +47,11 @@ private final class ScrollIndicatorHiderView: NSView {
     func hideIndicators() {
         DispatchQueue.main.async { [weak self] in
             guard let scrollView = self?.enclosingScrollView else { return }
+            scrollView.drawsBackground = false
+            scrollView.backgroundColor = .clear
+            scrollView.borderType = .noBorder
+            scrollView.contentView.drawsBackground = false
+            scrollView.contentView.backgroundColor = .clear
             scrollView.hasVerticalScroller = false
             scrollView.hasHorizontalScroller = false
             scrollView.verticalScroller?.isHidden = true
@@ -494,15 +499,26 @@ struct SidebarRow: View {
 }
 
 struct SidebarScrollBlurModifier: ViewModifier {
+    @Environment(\.sidebarScrollBlurBottom) private var bottomEdge
+
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
             content
         } else {
+            let resolvedBottomEdge = bottomEdge
             content.visualEffect { effect, geometry in
-                effect.blur(radius: SidebarScrollBlur.radius(
-                    for: geometry.frame(in: .named("sidebarPane")).minY
-                ))
+                let frame = geometry.frame(in: .named("sidebarPane"))
+                return effect
+                    .blur(radius: SidebarScrollBlur.radius(
+                        for: frame.minY,
+                        maxY: frame.maxY,
+                        bottomEdge: resolvedBottomEdge
+                    ))
+                    .opacity(SidebarScrollBlur.opacity(
+                        for: frame.maxY,
+                        bottomEdge: resolvedBottomEdge
+                    ))
             }
         }
     }
@@ -511,10 +527,34 @@ struct SidebarScrollBlurModifier: ViewModifier {
 enum SidebarScrollBlur {
     nonisolated static func radius(
         for minY: CGFloat,
+        maxY: CGFloat = -.infinity,
+        bottomEdge: CGFloat = .infinity,
         macOSMajorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
     ) -> CGFloat {
         guard macOSMajorVersion < 26 else { return 0 }
-        return min(10, max(0, -minY / 2))
+        let top = max(0, -minY / 2)
+        let bottom = max(0, (maxY - (bottomEdge - 18)) / 2)
+        return min(10, max(top, bottom))
+    }
+
+    nonisolated static func opacity(
+        for maxY: CGFloat,
+        bottomEdge: CGFloat,
+        macOSMajorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+    ) -> Double {
+        guard macOSMajorVersion < 26 else { return 1 }
+        return min(1, max(0, Double((bottomEdge - maxY) / 18)))
+    }
+}
+
+private struct SidebarScrollBlurBottomKey: EnvironmentKey {
+    static let defaultValue = CGFloat.infinity
+}
+
+extension EnvironmentValues {
+    var sidebarScrollBlurBottom: CGFloat {
+        get { self[SidebarScrollBlurBottomKey.self] }
+        set { self[SidebarScrollBlurBottomKey.self] = newValue }
     }
 }
 

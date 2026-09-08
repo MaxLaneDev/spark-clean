@@ -288,8 +288,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebarContent: some View {
-        IndicatorlessScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+        GeometryReader { viewport in
+            IndicatorlessScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
                 SidebarRow(
                     label: String(localized: "Dashboard"),
                     icon: "gauge.with.dots.needle.33percent",
@@ -384,10 +385,15 @@ struct ContentView: View {
                 ) {
                     selectedSidebar = .storageInsights
                 }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
+            .environment(
+                \.sidebarScrollBlurBottom,
+                viewport.frame(in: .named("sidebarPane")).maxY
+            )
         }
 
         // Scan progress

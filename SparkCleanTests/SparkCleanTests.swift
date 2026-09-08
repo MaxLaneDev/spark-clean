@@ -38,8 +38,18 @@ struct SidebarScrollBlurTests {
         #expect(SidebarScrollBlur.radius(for: -40, macOSMajorVersion: 15) == 10)
     }
 
+    @Test func contentBlursAndFadesBeforeTheAccessBanner() {
+        #expect(SidebarScrollBlur.radius(for: 20, maxY: 82, bottomEdge: 100, macOSMajorVersion: 15) == 0)
+        #expect(SidebarScrollBlur.radius(for: 20, maxY: 86, bottomEdge: 100, macOSMajorVersion: 15) == 2)
+        #expect(SidebarScrollBlur.radius(for: 20, maxY: 110, bottomEdge: 100, macOSMajorVersion: 15) == 10)
+        #expect(SidebarScrollBlur.opacity(for: 82, bottomEdge: 100, macOSMajorVersion: 15) == 1)
+        #expect(SidebarScrollBlur.opacity(for: 91, bottomEdge: 100, macOSMajorVersion: 15) == 0.5)
+        #expect(SidebarScrollBlur.opacity(for: 100, bottomEdge: 100, macOSMajorVersion: 15) == 0)
+    }
+
     @Test func macOS26KeepsNativeAppearance() {
         #expect(SidebarScrollBlur.radius(for: -40, macOSMajorVersion: 26) == 0)
+        #expect(SidebarScrollBlur.opacity(for: 100, bottomEdge: 100, macOSMajorVersion: 26) == 1)
     }
 }
 
