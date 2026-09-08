@@ -191,7 +191,10 @@ private struct WindowTransparencyConfigurator: NSViewRepresentable {
     }
 
     private func configure(_ window: NSWindow?) {
+        window?.styleMask.insert(.fullSizeContentView)
         window?.titlebarAppearsTransparent = true
+        window?.titleVisibility = .hidden
+        window?.titlebarSeparatorStyle = .none
     }
 }
 
