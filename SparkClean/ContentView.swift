@@ -43,28 +43,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
         .background(SidebarMaterialBackground())
-        .overlay(alignment: .top) {
-            sidebarTitlebarFade
-        }
         .accessibilityIdentifier("mainSidebar")
-    }
-
-    private var sidebarTitlebarFade: some View {
-        Rectangle()
-            .fill(.thinMaterial)
-            .frame(height: 48)
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: 0.55),
-                        .init(color: .clear, location: 1),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -405,6 +384,18 @@ struct ContentView: View {
             .padding(.horizontal, 8)
             .padding(.top, 32)
             .padding(.bottom, 8)
+        }
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [.clear, .black],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 32)
+
+                Rectangle().fill(.black)
+            }
         }
 
         // Scan progress
