@@ -46,6 +46,15 @@ struct ContentView: View {
             SidebarMaterialBackground()
                 .ignoresSafeArea(.container, edges: .top)
         }
+        .overlay(alignment: .top) {
+            LinearGradient(
+                colors: [.black.opacity(0.18), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 52)
+            .allowsHitTesting(false)
+        }
         .accessibilityIdentifier("mainSidebar")
     }
 
