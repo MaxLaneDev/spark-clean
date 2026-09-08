@@ -292,13 +292,7 @@ struct StartupManagerView: View {
                     }
                 }
             } actions: {
-                Picker("Filter", selection: $filter) {
-                    Text("All").tag(nil as StartupItem.ItemType?)
-                    Text("User Agents").tag(StartupItem.ItemType.userAgent as StartupItem.ItemType?)
-                    Text("System Agents").tag(StartupItem.ItemType.systemAgent as StartupItem.ItemType?)
-                    Text("Daemons").tag(StartupItem.ItemType.systemDaemon as StartupItem.ItemType?)
-                }
-                .pickerStyle(.segmented)
+                filterPicker
                 .frame(maxWidth: 360)
 
                 Button {
@@ -371,6 +365,16 @@ struct StartupManagerView: View {
         } message: {
             Text(manager.lastError ?? "")
         }
+    }
+
+    private var filterPicker: some View {
+        Picker("Filter", selection: $filter) {
+            Text("All").tag(nil as StartupItem.ItemType?)
+            Text("User Agents").tag(StartupItem.ItemType.userAgent as StartupItem.ItemType?)
+            Text("System Agents").tag(StartupItem.ItemType.systemAgent as StartupItem.ItemType?)
+            Text("Daemons").tag(StartupItem.ItemType.systemDaemon as StartupItem.ItemType?)
+        }
+        .pickerStyle(.segmented)
     }
 }
 
