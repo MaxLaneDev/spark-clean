@@ -46,6 +46,16 @@ struct ContentView: View {
             SidebarMaterialBackground()
                 .ignoresSafeArea(.container, edges: .top)
         }
+        .overlay(alignment: .top) {
+            LinearGradient(
+                colors: [.black.opacity(0.18), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 40)
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(false)
+        }
         .accessibilityIdentifier("mainSidebar")
     }
 
@@ -387,18 +397,6 @@ struct ContentView: View {
             .padding(.horizontal, 8)
             .padding(.top, 18)
             .padding(.bottom, 8)
-        }
-        .mask {
-            VStack(spacing: 0) {
-                Color.clear.frame(height: 22)
-                LinearGradient(
-                    colors: [.clear, .black],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 16)
-                Rectangle().fill(.black)
-            }
         }
 
         // Scan progress
