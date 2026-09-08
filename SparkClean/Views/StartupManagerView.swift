@@ -298,9 +298,12 @@ struct StartupManagerView: View {
                 Button {
                     manager.scan()
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                 }
                 .help("Rescan startup items")
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .tint(.blue)
                 .disabled(manager.isScanning)
             }
             .padding()
@@ -323,8 +326,12 @@ struct StartupManagerView: View {
                     Text("Click the refresh button to scan startup items")
                         .font(.body)
                         .foregroundStyle(.secondary)
-                    Button("Scan Now") { manager.scan() }
-                        .buttonStyle(.borderedProminent)
+                    Button { manager.scan() } label: {
+                        PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .tint(.blue)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

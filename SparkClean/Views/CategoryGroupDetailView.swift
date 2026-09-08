@@ -52,10 +52,11 @@ struct CategoryGroupDetailView: View {
                     Button {
                         Task { await manager.scan(onlyGroup: group) }
                     } label: {
-                        Label("Scan", systemImage: "arrow.clockwise")
+                        PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .tint(.blue)
                     .disabled(manager.isScanning)
 
                     if !groupCategories.isEmpty {
@@ -93,9 +94,11 @@ struct CategoryGroupDetailView: View {
                     Button {
                         Task { await manager.scan(onlyGroup: group) }
                     } label: {
-                        Label("Scan \(group.displayName)", systemImage: "magnifyingglass")
+                        PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                     }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .tint(.blue)
                     .disabled(manager.isScanning)
 
                     Spacer()
@@ -141,16 +144,10 @@ struct CategoryGroupDetailView: View {
                         manager.pendingCleanGroup = group
                         showCleanAlert = true
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "trash")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("Clean Selected")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        PrimaryActionLabel(title: String(localized: "Clean Selected"), systemImage: "trash")
                     }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
                     .tint(.red)
                     .disabled(manager.isScanning || manager.isCleaning || !hasSelectedContent)
                 }

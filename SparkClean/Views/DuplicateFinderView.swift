@@ -743,21 +743,17 @@ struct DuplicateFinderView: View {
                     manager.scanDuplicates()
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: manager.isScanning ? "xmark" : "arrow.clockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(
+                PrimaryActionLabel(
+                    title:
                         manager.isScanning
                             ? String(localized: "Cancel")
-                            : (manager.scanComplete ? String(localized: "Rescan") : String(localized: "Scan"))
-                    )
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
+                            : (manager.scanComplete ? String(localized: "Rescan") : String(localized: "Scan")),
+                    systemImage: manager.isScanning ? "xmark" : "magnifyingglass"
+                )
             }
             .buttonStyle(.borderedProminent)
-            .tint(manager.isScanning ? .orange : .teal)
+            .controlSize(.regular)
+            .tint(manager.isScanning ? .orange : .blue)
             .disabled(isCleaning)
 
             if manager.scanComplete {
@@ -769,7 +765,7 @@ struct DuplicateFinderView: View {
                         .font(.system(size: 14))
                 }
                 .menuStyle(.borderlessButton)
-                .frame(width: 30)
+                .frame(width: 30, height: 28)
             }
         }
         .padding(.horizontal, 24)
@@ -904,23 +900,13 @@ struct DuplicateFinderView: View {
             Button {
                 showCleanAlert = true
             } label: {
-                HStack(spacing: 8) {
-                    if isCleaning {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Cleaning...")
-                            .font(.system(size: 13, weight: .semibold))
-                    } else {
-                        Image(systemName: "trash")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Clean Selected")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 8)
+                PrimaryActionLabel(
+                    title: isCleaning ? String(localized: "Cleaning...") : String(localized: "Clean Selected"),
+                    systemImage: isCleaning ? "arrow.triangle.2.circlepath" : "trash"
+                )
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
             .tint(.red)
             .disabled(manager.selectedCount == 0 || isCleaning)
         }
@@ -949,15 +935,18 @@ struct DuplicateGroupRow: View {
                         .foregroundStyle(group.isSelected ? .teal : .secondary)
                 }
                 .buttonStyle(.plain)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
 
                 // Expand/collapse
                 Button(action: onToggleExpand) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 16)
+                        .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
 
                 // File info
                 VStack(alignment: .leading, spacing: 2) {
@@ -1055,7 +1044,7 @@ struct DuplicateGroupRow: View {
                                 }
                             }
                             .buttonStyle(.bordered)
-                            .controlSize(.mini)
+                            .controlSize(.small)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 4)

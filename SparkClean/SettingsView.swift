@@ -529,14 +529,21 @@ struct SettingsView: View {
 
     // MARK: Cleanup
 
+    private var deleteImmediately: Binding<Bool> {
+        Binding(
+            get: { !preferTrash },
+            set: { preferTrash = !$0 }
+        )
+    }
+
     private var cleanupTab: some View {
         Form {
             Section {
-                Toggle("Move files to Trash instead of deleting permanently", isOn: $preferTrash)
+                Toggle("Delete immediately without using Trash", isOn: deleteImmediately)
             } header: {
                 Text("Deletion Behavior")
             } footer: {
-                Text("When enabled, files are moved to Trash and can be restored. Trash failures are reported and may request administrator access; SparkClean never silently falls back to permanent deletion. Caution items always go to Trash.")
+                Text("When enabled, Cleanup and Uninstaller require an extra confirmation before permanent deletion. Permanently deleted items cannot be restored. Caution cleanup categories still go to Trash.")
             }
         }
         .formStyle(.grouped)

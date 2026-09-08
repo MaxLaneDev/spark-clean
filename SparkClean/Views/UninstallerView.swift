@@ -714,6 +714,12 @@ class UninstallerManager {
 
 // MARK: - Uninstaller View
 
+enum PermanentDeletionConfirmation {
+    static func allowsProceeding(hasPermanentItems: Bool, isConfirmed: Bool) -> Bool {
+        !hasPermanentItems || isConfirmed
+    }
+}
+
 struct UninstallerView: View {
     @Environment(\.layoutDirection) private var layoutDirection
     @State private var uninstaller = UninstallerManager()
@@ -727,7 +733,9 @@ struct UninstallerView: View {
     @State private var exportReport = ""
     @State private var isGeneratingReport = false
     @State private var lastUninstalledApp: String? = nil
+    @State private var lastUninstallUsedTrash = true
     @State private var isDropTargeted = false
+    @AppStorage("preferTrash") private var preferTrash = true
 
     private var appListPane: some View {
         appListSection
@@ -762,14 +770,18 @@ struct UninstallerView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("\"\(appName)\" moved to Trash")
+                    Text(lastUninstallUsedTrash
+                         ? String(localized: "\"\(appName)\" moved to Trash")
+                         : String(localized: "\"\(appName)\" deleted permanently"))
                         .font(.callout)
                     Spacer()
-                    Button("Open Trash") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.Trash"))
+                    if lastUninstallUsedTrash {
+                        Button("Open Trash") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.Trash"))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                     Button {
                         lastUninstalledApp = nil
                     } label: {
@@ -778,6 +790,8 @@ struct UninstallerView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Dismiss")
                 }
                 .padding(.horizontal, 20)
@@ -802,43 +816,11 @@ struct UninstallerView: View {
                 welcomeSection
             }
         }
-        .alert("Uninstall App?", isPresented: $showUninstallAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Move to Trash", role: .destructive) {
-                if let app = appToUninstall {
-                    Task {
-                        isUninstalling = true
-                        let outcome = await uninstaller.uninstallApp(app)
-                        if outcome.appRemoved {
-                            selectedApp = nil
-                            uninstaller.apps.removeAll(where: { $0.id == app.id })
-                            lastUninstalledApp = app.name
-                            if outcome.failedRelatedItems > 0 {
-                                uninstallIssueTitle = String(localized: "Uninstall Partially Completed")
-                                uninstallError = String(localized: "\"\(app.name)\" was moved to Trash, but \(outcome.failedRelatedItems) selected leftover item(s) could not be removed.")
-                            }
-                            Task {
-                                try? await Task.sleep(for: .seconds(5))
-                                if lastUninstalledApp == app.name {
-                                    lastUninstalledApp = nil
-                                }
-                            }
-                        } else {
-                            uninstallIssueTitle = String(localized: "Uninstall Failed")
-                            let reason = outcome.appFailureReason
-                                ?? String(localized: "The item may be in use or require different permissions.")
-                            uninstallError = String(localized: "Could not move \"\(app.name)\" to Trash. \(reason)")
-                        }
-                        isUninstalling = false
-                    }
-                }
-            }
-        } message: {
+        .sheet(isPresented: $showUninstallAlert) {
             if let app = appToUninstall {
-                let selectedRelated = app.relatedPaths.filter(\.isSelected)
-                let selectedSize = app.appSize +
-                    selectedRelated.reduce(0 as Int64) { $0 + $1.size }
-                Text("This will move \"\(app.name)\" and \(selectedRelated.count) selected related location(s) (\(CleanupManager.formatBytes(selectedSize))) to Trash. Unselected data stays in place.")
+                UninstallConfirmationSheet(app: app, useTrash: preferTrash) { trashOnly in
+                    performUninstall(app, trashOnly: trashOnly)
+                }
             }
         }
         .sheet(isPresented: $showExportSheet) {
@@ -851,6 +833,39 @@ struct UninstallerView: View {
             Button("OK", role: .cancel) { uninstallError = nil }
         } message: {
             Text(uninstallError ?? "")
+        }
+    }
+
+    private func performUninstall(_ app: AppInfo, trashOnly: Bool) {
+        Task {
+            isUninstalling = true
+            let outcome = await uninstaller.uninstallApp(app, trashOnly: trashOnly)
+            if outcome.appRemoved {
+                selectedApp = nil
+                uninstaller.apps.removeAll(where: { $0.id == app.id })
+                lastUninstallUsedTrash = trashOnly
+                lastUninstalledApp = app.name
+                if outcome.failedRelatedItems > 0 {
+                    uninstallIssueTitle = String(localized: "Uninstall Partially Completed")
+                    uninstallError = trashOnly
+                        ? String(localized: "\"\(app.name)\" was moved to Trash, but \(outcome.failedRelatedItems) selected leftover item(s) could not be removed.")
+                        : String(localized: "\"\(app.name)\" was deleted, but \(outcome.failedRelatedItems) selected leftover item(s) could not be removed.")
+                }
+                Task {
+                    try? await Task.sleep(for: .seconds(5))
+                    if lastUninstalledApp == app.name {
+                        lastUninstalledApp = nil
+                    }
+                }
+            } else {
+                uninstallIssueTitle = String(localized: "Uninstall Failed")
+                let reason = outcome.appFailureReason
+                    ?? String(localized: "The item may be in use or require different permissions.")
+                uninstallError = trashOnly
+                    ? String(localized: "Could not move \"\(app.name)\" to Trash. \(reason)")
+                    : String(localized: "Could not permanently delete \"\(app.name)\". \(reason)")
+            }
+            isUninstalling = false
         }
     }
 
@@ -887,20 +902,17 @@ struct UninstallerView: View {
                 selectedApp = nil
                 Task { await uninstaller.scanApps() }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(
+                PrimaryActionLabel(
+                    title:
                         uninstaller.isScanning
                             ? String(localized: "Scanning...")
-                            : (uninstaller.scanComplete ? String(localized: "Rescan") : String(localized: "Scan Apps"))
-                    )
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
+                            : (uninstaller.scanComplete ? String(localized: "Rescan") : String(localized: "Scan")),
+                    systemImage: "magnifyingglass"
+                )
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(.blue)
             .disabled(uninstaller.isScanning)
 
             if uninstaller.scanComplete {
@@ -920,7 +932,7 @@ struct UninstallerView: View {
                         .font(.system(size: 14))
                 }
                 .menuStyle(.borderlessButton)
-                .frame(width: 30)
+                .frame(width: 30, height: 28)
             }
         }
         .padding(.horizontal, 24)
@@ -1074,7 +1086,7 @@ struct UninstallerView: View {
                                         .font(.caption)
                                 }
                                 .buttonStyle(.bordered)
-                                .controlSize(.mini)
+                                .controlSize(.small)
                             }
                             .padding(10)
                             .background(
@@ -1112,23 +1124,13 @@ struct UninstallerView: View {
                         } ?? app
                         showUninstallAlert = true
                     } label: {
-                        HStack(spacing: 8) {
-                            if isUninstalling {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Uninstalling...")
-                                    .font(.system(size: 14, weight: .semibold))
-                            } else {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text("Uninstall \(app.name)")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 10)
+                        PrimaryActionLabel(
+                            title: isUninstalling ? String(localized: "Uninstalling...") : String(localized: "Uninstall"),
+                            systemImage: isUninstalling ? "arrow.triangle.2.circlepath" : "trash"
+                        )
                     }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
                     .tint(.red)
                     .disabled(isUninstalling)
                     Spacer()
@@ -1263,6 +1265,74 @@ struct UninstallerView: View {
             }
             return true
         }
+    }
+}
+
+// MARK: - Uninstall Confirmation
+
+private struct UninstallConfirmationSheet: View {
+    let app: AppInfo
+    let useTrash: Bool
+    let onConfirm: (Bool) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmsPermanentDeletion = false
+
+    private var selectedRelated: [RelatedPath] {
+        app.relatedPaths.filter(\.isSelected)
+    }
+
+    private var selectedSize: Int64 {
+        app.appSize + selectedRelated.reduce(0 as Int64) { $0 + $1.size }
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: useTrash ? "trash.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(useTrash ? .blue : .red)
+
+            Text("Uninstall \(app.name)?")
+                .font(.title2.bold())
+
+            Text(useTrash
+                 ? String(localized: "The app and \(selectedRelated.count) selected related location(s) (\(CleanupManager.formatBytes(selectedSize))) will be moved to Trash. Unselected data stays in place.")
+                 : String(localized: "The app and \(selectedRelated.count) selected related location(s) (\(CleanupManager.formatBytes(selectedSize))) will be deleted permanently. Unselected data stays in place."))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+
+            if !useTrash {
+                Toggle(
+                    "I understand that permanently deleted items cannot be restored",
+                    isOn: $confirmsPermanentDeletion
+                )
+                .toggleStyle(.checkbox)
+                .font(.callout.weight(.semibold))
+            }
+
+            HStack(spacing: 12) {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                Spacer()
+
+                Button(useTrash ? "Move to Trash" : "Delete Permanently", role: .destructive) {
+                    dismiss()
+                    onConfirm(useTrash)
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .controlSize(.large)
+                .disabled(!PermanentDeletionConfirmation.allowsProceeding(
+                    hasPermanentItems: !useTrash,
+                    isConfirmed: confirmsPermanentDeletion
+                ))
+            }
+        }
+        .padding(24)
+        .frame(width: 480)
     }
 }
 

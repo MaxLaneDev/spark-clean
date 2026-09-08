@@ -27,6 +27,7 @@ struct SparkCleanApp: App {
                 showUpdateSheet: $showUpdateSheet
             )
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 960, height: 680)
         .windowResizability(.contentSize)
         .commands {

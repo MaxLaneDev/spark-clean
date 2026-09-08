@@ -88,6 +88,7 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     private func generateAndShowReport(verbose: Bool) {
@@ -446,7 +447,7 @@ struct ContentView: View {
                 }
                 .font(.caption2)
                 .buttonStyle(.bordered)
-                .controlSize(.mini)
+                .controlSize(.small)
             }
             .padding(12)
             .background(
@@ -543,10 +544,12 @@ struct DashboardView: View {
             Spacer()
 
             if manager.isScanning {
-                Button("Cancel") { manager.cancelScan() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(.red)
+                Button { manager.cancelScan() } label: {
+                    PrimaryActionLabel(title: String(localized: "Cancel"), systemImage: "xmark")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .tint(.orange)
             }
 
             if manager.scanComplete {
@@ -554,16 +557,13 @@ struct DashboardView: View {
                     manager.pendingCleanGroup = nil
                     showCleanAlert = true
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(manager.isCleaning ? String(localized: "Cleaning...") : String(localized: "Clean"))
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
+                    PrimaryActionLabel(
+                        title: manager.isCleaning ? String(localized: "Cleaning...") : String(localized: "Clean"),
+                        systemImage: "trash"
+                    )
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
                 .tint(.red)
                 .disabled(manager.isScanning || manager.isCleaning || !manager.hasSelectedContent)
             }
@@ -571,20 +571,17 @@ struct DashboardView: View {
             Button {
                 Task { await manager.scan() }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: manager.isScanning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(
+                PrimaryActionLabel(
+                    title:
                         manager.isScanning
                             ? String(localized: "Scanning...")
-                            : (manager.scanComplete ? String(localized: "Rescan") : String(localized: "Scan"))
-                    )
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
+                            : (manager.scanComplete ? String(localized: "Rescan") : String(localized: "Scan")),
+                    systemImage: manager.isScanning ? "arrow.triangle.2.circlepath" : "magnifyingglass"
+                )
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(.blue)
             .disabled(manager.isScanning || manager.isCleaning)
 
             if manager.scanComplete {
@@ -600,7 +597,7 @@ struct DashboardView: View {
                         .font(.system(size: 14))
                 }
                 .menuStyle(.borderlessButton)
-                .frame(width: 30)
+                .frame(width: 30, height: 28)
             }
         }
         .padding(.horizontal, 24)
@@ -864,6 +861,7 @@ struct CleanConfirmationSheet: View {
     @Binding var isPresented: Bool
     let onConfirm: (Bool) -> Void
     @AppStorage("preferTrash") private var preferTrash = true
+    @State private var confirmsPermanentDeletion = false
 
     private var selectedCategories: [CleanupCategory] {
         manager.categories.filter {
@@ -1089,6 +1087,19 @@ struct CleanConfirmationSheet: View {
             }
             .frame(maxHeight: 380)
 
+            if !permanentItems.isEmpty {
+                Divider()
+
+                Toggle(
+                    "I understand that permanently deleted items cannot be restored",
+                    isOn: $confirmsPermanentDeletion
+                )
+                .toggleStyle(.checkbox)
+                .font(.callout.weight(.semibold))
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+            }
+
             Divider()
 
             // Buttons
@@ -1110,6 +1121,10 @@ struct CleanConfirmationSheet: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
+                    .disabled(!PermanentDeletionConfirmation.allowsProceeding(
+                        hasPermanentItems: !permanentItems.isEmpty,
+                        isConfirmed: confirmsPermanentDeletion
+                    ))
 
                     Button {
                         isPresented = false
@@ -1124,6 +1139,10 @@ struct CleanConfirmationSheet: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
                     .controlSize(.large)
+                    .disabled(!PermanentDeletionConfirmation.allowsProceeding(
+                        hasPermanentItems: !permanentItems.isEmpty,
+                        isConfirmed: confirmsPermanentDeletion
+                    ))
                 } else {
                     Button {
                         isPresented = false
@@ -1142,6 +1161,10 @@ struct CleanConfirmationSheet: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
                     .controlSize(.large)
+                    .disabled(!PermanentDeletionConfirmation.allowsProceeding(
+                        hasPermanentItems: !permanentItems.isEmpty,
+                        isConfirmed: confirmsPermanentDeletion
+                    ))
                 }
             }
             .padding(20)

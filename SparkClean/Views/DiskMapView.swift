@@ -98,14 +98,14 @@ struct DiskMapView: View {
                     Task { await manager.scan() }
                 }
             } label: {
-                Label(
-                    manager.isScanning ? String(localized: "Cancel") : String(localized: "Analyze Disk"),
+                PrimaryActionLabel(
+                    title: manager.isScanning ? String(localized: "Cancel") : String(localized: "Scan"),
                     systemImage: manager.isScanning ? "xmark.circle" : "magnifyingglass"
                 )
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .tint(manager.isScanning ? .red : .indigo)
+            .controlSize(.regular)
+            .tint(manager.isScanning ? .orange : .blue)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
@@ -485,11 +485,14 @@ struct DiskMapView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
-            Button("Analyze Disk") {
+            Button {
                 Task { await manager.scan() }
+            } label: {
+                PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
             }
             .buttonStyle(.borderedProminent)
-            .tint(.indigo)
+            .controlSize(.regular)
+            .tint(.blue)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

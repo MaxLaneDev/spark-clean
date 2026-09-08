@@ -314,10 +314,14 @@ struct MaintenanceView: View {
                     .disabled(manager.isRunningAll)
                 }
 
-                Button("Run Selected (\(manager.selectedCount))") {
+                Button {
                     showRunConfirmation = true
+                } label: {
+                    PrimaryActionLabel(title: String(localized: "Run Selected"), systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .tint(.blue)
                 .disabled(manager.selectedCount == 0 || manager.isRunningAll)
             }
             .padding()

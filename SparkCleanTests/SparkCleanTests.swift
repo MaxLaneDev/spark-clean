@@ -10,6 +10,23 @@ import Foundation
 import SwiftUI
 @testable import SparkClean
 
+struct PermanentDeletionConfirmationTests {
+    @Test func permanentDeletionRequiresExplicitConfirmation() {
+        #expect(PermanentDeletionConfirmation.allowsProceeding(
+            hasPermanentItems: false,
+            isConfirmed: false
+        ))
+        #expect(!PermanentDeletionConfirmation.allowsProceeding(
+            hasPermanentItems: true,
+            isConfirmed: false
+        ))
+        #expect(PermanentDeletionConfirmation.allowsProceeding(
+            hasPermanentItems: true,
+            isConfirmed: true
+        ))
+    }
+}
+
 // MARK: - Localization Tests
 
 struct LocalizationTests {
@@ -566,6 +583,31 @@ struct DockerSizeParserTests {
     }
 }
 
+struct GoogleDriveCacheTests {
+
+    @Test func findsOnlyAccountContentCaches() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sparkclean-drivefs-\(ProcessInfo.processInfo.globallyUniqueString)")
+        let expected = root.appendingPathComponent("account-a/content_cache")
+        try fm.createDirectory(at: expected, withIntermediateDirectories: true)
+        try fm.createDirectory(
+            at: root.appendingPathComponent("account-b/metadata"),
+            withIntermediateDirectories: true
+        )
+        fm.createFile(
+            atPath: root.appendingPathComponent("account-c/content_cache").path,
+            contents: Data()
+        )
+        defer { try? fm.removeItem(at: root) }
+
+        #expect(
+            CleanupManager.googleDriveContentCachePaths(in: root.path, fileManager: fm)
+                == [expected.path]
+        )
+    }
+}
+
 // MARK: - Broken Symlink Scan Tests (issue #9)
 
 /// Exercises the testable core of the broken-symlink scan against real fixture trees
@@ -997,6 +1039,7 @@ struct StorageInsightsTests {
 
 // MARK: - Scan Audit Tests
 
+@MainActor
 struct ScanAuditLoggerTests {
 
     @Test func latestScanSnapshotIsAtomicPrivateAndDecodable() throws {

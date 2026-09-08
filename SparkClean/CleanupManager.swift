@@ -935,6 +935,16 @@ class CleanupManager {
             ["\(home)/Library/Containers/com.microsoft.OneDrive-mac/Data/Library/Caches"]
         },
 
+        ScanDefinition(name: "Google Drive Cache", stableName: "Google Drive Cache", icon: "externaldrive.badge.icloud", color: .blue,
+            description: "Google Drive streamed-file cache — files are downloaded again when needed",
+            group: .applications, safetyLevel: .review, defaultSelected: false,
+            cleanupWarning: "Google Drive must be closed. Offline files may need to be downloaded again.",
+            associatedBundleIDs: ["com.google.drivefs"]) {
+            CleanupManager.googleDriveContentCachePaths(
+                in: "\(home)/Library/Application Support/Google/DriveFS"
+            )
+        },
+
         ScanDefinition(name: "Dropbox Cache", stableName: "Dropbox Cache", icon: "cloud", color: .blue,
             description: "Legacy Dropbox cache — review because it can contain pending or recently deleted material",
             group: .applications, safetyLevel: .review, defaultSelected: false) {
@@ -4622,6 +4632,25 @@ class CleanupManager {
             if FileManager.default.fileExists(atPath: path) { return path }
         }
         return nil
+    }
+
+    static func googleDriveContentCachePaths(
+        in driveFSRoot: String,
+        fileManager fm: FileManager = .default
+    ) -> [String] {
+        guard let accountDirectories = try? fm.contentsOfDirectory(atPath: driveFSRoot) else {
+            return []
+        }
+        return accountDirectories.compactMap { account in
+            let path = URL(fileURLWithPath: driveFSRoot)
+                .appendingPathComponent(account, isDirectory: true)
+                .appendingPathComponent("content_cache", isDirectory: true)
+                .path
+            var isDirectory: ObjCBool = false
+            return fm.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
+                ? path
+                : nil
+        }.sorted()
     }
 
     static func findOllama() -> String? {

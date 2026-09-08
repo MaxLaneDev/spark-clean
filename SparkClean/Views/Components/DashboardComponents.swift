@@ -7,6 +7,19 @@
 
 import SwiftUI
 
+struct PrimaryActionLabel: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: 92, height: 22)
+    }
+}
+
 // MARK: - Disk Usage Card
 
 struct DiskUsageCardView: View {
@@ -273,6 +286,7 @@ struct SidebarRow: View {
 
                 Text(label)
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
 
                 Spacer()
 
@@ -287,10 +301,10 @@ struct SidebarRow: View {
                     Text("\(badgeCount)")
                         .font(.caption2)
                         .fontWeight(.medium)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(iconColor)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(iconColor.opacity(0.7)))
+                        .background(Capsule().fill(iconColor.opacity(0.15)))
                         .accessibilityLabel("\(badgeCount) items")
                 }
             }

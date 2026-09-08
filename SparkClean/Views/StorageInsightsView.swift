@@ -51,12 +51,14 @@ struct StorageInsightsView: View {
                     Task { await manager.measure(today: StorageInsightsManager.todayString(Date())) }
                 }
             } label: {
-                Label(
-                    manager.isMeasuring ? String(localized: "Cancel") : String(localized: "Refresh"),
+                PrimaryActionLabel(
+                    title: manager.isMeasuring ? String(localized: "Cancel") : String(localized: "Refresh"),
                     systemImage: manager.isMeasuring ? "xmark.circle" : "arrow.clockwise"
                 )
             }
-            .buttonStyle(.bordered).controlSize(.small)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(manager.isMeasuring ? .orange : .blue)
         }
         .padding(.horizontal, 24).padding(.vertical, 16)
     }
@@ -151,17 +153,19 @@ struct StorageInsightsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Review & Clear") {
+                    Button {
                         onReviewWhatsAppCleanup()
+                    } label: {
+                        PrimaryActionLabel(title: String(localized: "Review & Clear"), systemImage: "trash")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
                     .tint(.red)
                 }
                 .padding(.leading, 34)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
     }
 }

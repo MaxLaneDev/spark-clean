@@ -83,9 +83,11 @@ struct TimeMachineView: View {
                 selected.removeAll()
                 Task { await manager.refresh() }
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                PrimaryActionLabel(title: String(localized: "Refresh"), systemImage: "arrow.clockwise")
             }
-            .buttonStyle(.bordered).controlSize(.small)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(.blue)
             .disabled(manager.isBusy)
         }
         .padding(.horizontal, 24).padding(.vertical, 16)
@@ -132,7 +134,7 @@ struct TimeMachineView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.06)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 8)
@@ -156,10 +158,11 @@ struct TimeMachineView: View {
             Button {
                 showConfirm = true
             } label: {
-                Label("Delete Selected (\(selected.count))", systemImage: "trash")
+                PrimaryActionLabel(title: String(localized: "Delete Selected"), systemImage: "trash")
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            .controlSize(.regular)
+            .tint(.red)
             .disabled(selected.isEmpty || manager.isBusy)
         }
         .padding(.horizontal, 24).padding(.vertical, 12)
