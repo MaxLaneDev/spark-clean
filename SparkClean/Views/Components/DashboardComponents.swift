@@ -485,7 +485,7 @@ struct SidebarRow: View {
                 }
             }
             .contentShape(Rectangle())
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
         }
         .frame(maxWidth: .infinity)
         .buttonStyle(.plain)

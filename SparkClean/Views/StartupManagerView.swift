@@ -292,7 +292,12 @@ struct StartupManagerView: View {
                     }
                 }
             } actions: {
-                filterPicker
+                ViewThatFits(in: .horizontal) {
+                    filterPicker
+                        .fixedSize(horizontal: true, vertical: false)
+                    filterPicker
+                        .labelsHidden()
+                }
                 .frame(maxWidth: 360)
 
                 Button {
