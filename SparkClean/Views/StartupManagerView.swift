@@ -357,7 +357,6 @@ struct StartupManagerView: View {
                 }
             }
         }
-        .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             if manager.items.isEmpty {
                 manager.scan()
