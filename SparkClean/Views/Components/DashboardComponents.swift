@@ -20,6 +20,38 @@ struct PrimaryActionLabel: View {
     }
 }
 
+extension View {
+    @ViewBuilder
+    func platformPrimaryActionStyle(tint: Color) -> some View {
+        if #available(macOS 26.0, *) {
+            buttonStyle(.glassProminent)
+                .tint(tint)
+        } else {
+            buttonStyle(.borderedProminent)
+                .tint(tint)
+        }
+    }
+
+    @ViewBuilder
+    func platformHeaderSurface() -> some View {
+        if #available(macOS 26.0, *) {
+            glassEffect(.regular, in: Rectangle())
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func platformOverflowMenuStyle() -> some View {
+        if #available(macOS 26.0, *) {
+            menuStyle(.automatic)
+                .buttonStyle(.glass)
+        } else {
+            menuStyle(.borderlessButton)
+        }
+    }
+}
+
 // MARK: - Disk Usage Card
 
 struct DiskUsageCardView: View {

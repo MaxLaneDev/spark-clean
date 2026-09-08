@@ -910,9 +910,8 @@ struct UninstallerView: View {
                     systemImage: "magnifyingglass"
                 )
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: .blue)
             .controlSize(.regular)
-            .tint(.blue)
             .disabled(uninstaller.isScanning)
 
             if uninstaller.scanComplete {
@@ -931,12 +930,13 @@ struct UninstallerView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 14))
                 }
-                .menuStyle(.borderlessButton)
+                .platformOverflowMenuStyle()
                 .frame(width: 30, height: 28)
             }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
+        .platformHeaderSurface()
     }
 
     // MARK: - App List
@@ -1129,9 +1129,8 @@ struct UninstallerView: View {
                             systemImage: isUninstalling ? "arrow.triangle.2.circlepath" : "trash"
                         )
                     }
-                    .buttonStyle(.borderedProminent)
+                    .platformPrimaryActionStyle(tint: .red)
                     .controlSize(.regular)
-                    .tint(.red)
                     .disabled(isUninstalling)
                     Spacer()
                 }

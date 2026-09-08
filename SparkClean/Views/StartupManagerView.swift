@@ -301,12 +301,12 @@ struct StartupManagerView: View {
                     PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                 }
                 .help("Rescan startup items")
-                .buttonStyle(.borderedProminent)
+                .platformPrimaryActionStyle(tint: .blue)
                 .controlSize(.regular)
-                .tint(.blue)
                 .disabled(manager.isScanning)
             }
             .padding()
+            .platformHeaderSurface()
 
             Divider()
 
@@ -329,9 +329,8 @@ struct StartupManagerView: View {
                     Button { manager.scan() } label: {
                         PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .platformPrimaryActionStyle(tint: .blue)
                     .controlSize(.regular)
-                    .tint(.blue)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

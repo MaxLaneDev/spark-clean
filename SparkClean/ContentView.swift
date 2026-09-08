@@ -547,9 +547,8 @@ struct DashboardView: View {
                 Button { manager.cancelScan() } label: {
                     PrimaryActionLabel(title: String(localized: "Cancel"), systemImage: "xmark")
                 }
-                .buttonStyle(.borderedProminent)
+                .platformPrimaryActionStyle(tint: .orange)
                 .controlSize(.regular)
-                .tint(.orange)
             }
 
             if manager.scanComplete {
@@ -562,9 +561,8 @@ struct DashboardView: View {
                         systemImage: "trash"
                     )
                 }
-                .buttonStyle(.borderedProminent)
+                .platformPrimaryActionStyle(tint: .red)
                 .controlSize(.regular)
-                .tint(.red)
                 .disabled(manager.isScanning || manager.isCleaning || !manager.hasSelectedContent)
             }
 
@@ -579,9 +577,8 @@ struct DashboardView: View {
                     systemImage: manager.isScanning ? "arrow.triangle.2.circlepath" : "magnifyingglass"
                 )
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: .blue)
             .controlSize(.regular)
-            .tint(.blue)
             .disabled(manager.isScanning || manager.isCleaning)
 
             if manager.scanComplete {
@@ -596,12 +593,13 @@ struct DashboardView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 14))
                 }
-                .menuStyle(.borderlessButton)
+                .platformOverflowMenuStyle()
                 .frame(width: 30, height: 28)
             }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
+        .platformHeaderSurface()
     }
 
     private var sizeGradient: LinearGradient {

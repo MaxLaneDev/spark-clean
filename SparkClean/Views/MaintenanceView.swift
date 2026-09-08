@@ -319,12 +319,12 @@ struct MaintenanceView: View {
                 } label: {
                     PrimaryActionLabel(title: String(localized: "Run Selected"), systemImage: "play.fill")
                 }
-                .buttonStyle(.borderedProminent)
+                .platformPrimaryActionStyle(tint: .blue)
                 .controlSize(.regular)
-                .tint(.blue)
                 .disabled(manager.selectedCount == 0 || manager.isRunningAll)
             }
             .padding()
+            .platformHeaderSurface()
 
             Divider()
 

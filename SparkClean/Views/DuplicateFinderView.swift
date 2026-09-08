@@ -751,9 +751,8 @@ struct DuplicateFinderView: View {
                     systemImage: manager.isScanning ? "xmark" : "magnifyingglass"
                 )
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: manager.isScanning ? .orange : .blue)
             .controlSize(.regular)
-            .tint(manager.isScanning ? .orange : .blue)
             .disabled(isCleaning)
 
             if manager.scanComplete {
@@ -764,12 +763,13 @@ struct DuplicateFinderView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 14))
                 }
-                .menuStyle(.borderlessButton)
+                .platformOverflowMenuStyle()
                 .frame(width: 30, height: 28)
             }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
+        .platformHeaderSurface()
     }
 
     // MARK: - Scanning
@@ -905,9 +905,8 @@ struct DuplicateFinderView: View {
                     systemImage: isCleaning ? "arrow.triangle.2.circlepath" : "trash"
                 )
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: .red)
             .controlSize(.regular)
-            .tint(.red)
             .disabled(manager.selectedCount == 0 || isCleaning)
         }
         .padding(.horizontal, 24)

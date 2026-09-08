@@ -56,11 +56,11 @@ struct StorageInsightsView: View {
                     systemImage: manager.isMeasuring ? "xmark.circle" : "arrow.clockwise"
                 )
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: manager.isMeasuring ? .orange : .blue)
             .controlSize(.regular)
-            .tint(manager.isMeasuring ? .orange : .blue)
         }
         .padding(.horizontal, 24).padding(.vertical, 16)
+        .platformHeaderSurface()
     }
 
     private var banner: some View {
@@ -158,9 +158,8 @@ struct StorageInsightsView: View {
                     } label: {
                         PrimaryActionLabel(title: String(localized: "Review & Clear"), systemImage: "trash")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .platformPrimaryActionStyle(tint: .red)
                     .controlSize(.regular)
-                    .tint(.red)
                 }
                 .padding(.leading, 34)
             }

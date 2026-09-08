@@ -85,12 +85,12 @@ struct TimeMachineView: View {
             } label: {
                 PrimaryActionLabel(title: String(localized: "Refresh"), systemImage: "arrow.clockwise")
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: .blue)
             .controlSize(.regular)
-            .tint(.blue)
             .disabled(manager.isBusy)
         }
         .padding(.horizontal, 24).padding(.vertical, 16)
+        .platformHeaderSurface()
     }
 
     private var infoBanner: some View {
@@ -160,9 +160,8 @@ struct TimeMachineView: View {
             } label: {
                 PrimaryActionLabel(title: String(localized: "Delete Selected"), systemImage: "trash")
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: .red)
             .controlSize(.regular)
-            .tint(.red)
             .disabled(selected.isEmpty || manager.isBusy)
         }
         .padding(.horizontal, 24).padding(.vertical, 12)

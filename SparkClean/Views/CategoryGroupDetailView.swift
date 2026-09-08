@@ -54,9 +54,8 @@ struct CategoryGroupDetailView: View {
                     } label: {
                         PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .platformPrimaryActionStyle(tint: .blue)
                     .controlSize(.regular)
-                    .tint(.blue)
                     .disabled(manager.isScanning)
 
                     if !groupCategories.isEmpty {
@@ -72,6 +71,7 @@ struct CategoryGroupDetailView: View {
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
+            .platformHeaderSurface()
 
             Divider()
 
@@ -96,9 +96,8 @@ struct CategoryGroupDetailView: View {
                     } label: {
                         PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .platformPrimaryActionStyle(tint: .blue)
                     .controlSize(.regular)
-                    .tint(.blue)
                     .disabled(manager.isScanning)
 
                     Spacer()
@@ -146,9 +145,8 @@ struct CategoryGroupDetailView: View {
                     } label: {
                         PrimaryActionLabel(title: String(localized: "Clean Selected"), systemImage: "trash")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .platformPrimaryActionStyle(tint: .red)
                     .controlSize(.regular)
-                    .tint(.red)
                     .disabled(manager.isScanning || manager.isCleaning || !hasSelectedContent)
                 }
                 .padding(.horizontal, 24)

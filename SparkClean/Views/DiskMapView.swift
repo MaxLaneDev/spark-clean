@@ -103,12 +103,12 @@ struct DiskMapView: View {
                     systemImage: manager.isScanning ? "xmark.circle" : "magnifyingglass"
                 )
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: manager.isScanning ? .orange : .blue)
             .controlSize(.regular)
-            .tint(manager.isScanning ? .orange : .blue)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
+        .platformHeaderSurface()
     }
 
     private var progressBanner: some View {
@@ -490,9 +490,8 @@ struct DiskMapView: View {
             } label: {
                 PrimaryActionLabel(title: String(localized: "Scan"), systemImage: "magnifyingglass")
             }
-            .buttonStyle(.borderedProminent)
+            .platformPrimaryActionStyle(tint: .blue)
             .controlSize(.regular)
-            .tint(.blue)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
