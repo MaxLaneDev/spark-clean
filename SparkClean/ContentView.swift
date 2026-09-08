@@ -385,11 +385,10 @@ struct ContentView: View {
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .contentMargins(.top, 34, for: .scrollContent)
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(.ultraThinMaterial)
-                .frame(height: 48)
+                .frame(height: 34)
                 .mask(
                     LinearGradient(
                         stops: [
