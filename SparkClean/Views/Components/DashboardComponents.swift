@@ -16,7 +16,7 @@ struct PrimaryActionLabel: View {
             .font(.system(size: 13, weight: .semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .frame(width: 92, height: 22)
+            .frame(width: 112, height: 22)
     }
 }
 
@@ -29,7 +29,7 @@ struct ToolbarActionLabel: View {
             .font(.system(size: 13, weight: .semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .frame(width: 92, height: 28)
+            .frame(width: 112, height: 28)
     }
 }
 

@@ -42,7 +42,7 @@ struct ContentView: View {
             sidebarContent
         }
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.ultraThinMaterial)
         .accessibilityIdentifier("mainSidebar")
     }
 
