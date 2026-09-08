@@ -82,7 +82,9 @@ final class DiskMapManager {
     static let shared = DiskMapManager()
 
     var snapshot: DiskMapSnapshot?
-    var isScanning = false
+    var isScanning = false {
+        didSet { ScanActivityTracker.shared.update(from: oldValue, to: isScanning) }
+    }
     var currentItem = ""
     var lastError: String?
     var didHandleLaunchRequest = false

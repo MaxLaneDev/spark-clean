@@ -10,6 +10,18 @@ import Foundation
 import SwiftUI
 @testable import SparkClean
 
+struct ScanActivityTrackerTests {
+    @Test func tracksConcurrentScanTransitions() {
+        let tracker = ScanActivityTracker()
+        tracker.update(from: false, to: true)
+        tracker.update(from: false, to: true)
+        tracker.update(from: true, to: false)
+        #expect(tracker.isActive)
+        tracker.update(from: true, to: false)
+        #expect(!tracker.isActive)
+    }
+}
+
 struct PermanentDeletionConfirmationTests {
     @Test func permanentDeletionRequiresExplicitConfirmation() {
         #expect(PermanentDeletionConfirmation.allowsProceeding(

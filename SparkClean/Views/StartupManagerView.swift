@@ -41,7 +41,9 @@ struct StartupItem: Identifiable {
 @Observable
 class StartupManager {
     var items: [StartupItem] = []
-    var isScanning = false
+    var isScanning = false {
+        didSet { ScanActivityTracker.shared.update(from: oldValue, to: isScanning) }
+    }
     var togglingItemIDs = Set<UUID>()
     var lastError: String?
 

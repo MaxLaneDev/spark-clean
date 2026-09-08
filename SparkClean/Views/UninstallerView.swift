@@ -30,7 +30,9 @@ struct UninstallOutcome {
 @Observable
 class UninstallerManager {
     var apps: [AppInfo] = [] { didSet { updateFilteredApps() } }
-    var isScanning = false
+    var isScanning = false {
+        didSet { ScanActivityTracker.shared.update(from: oldValue, to: isScanning) }
+    }
     var scanComplete = false
     var searchQuery = "" { didSet { updateFilteredApps() } }
     var sortOrder: AppSortOrder = .totalSize { didSet { updateFilteredApps() } }

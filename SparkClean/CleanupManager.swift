@@ -17,7 +17,9 @@ import Darwin
 @Observable
 class CleanupManager {
     var categories: [CleanupCategory] = []
-    var isScanning = false
+    var isScanning = false {
+        didSet { ScanActivityTracker.shared.update(from: oldValue, to: isScanning) }
+    }
     var scanComplete = false
     var isCleaning = false
     var cleanComplete = false

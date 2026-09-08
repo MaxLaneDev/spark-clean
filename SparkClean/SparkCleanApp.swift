@@ -8,8 +8,37 @@
 import SwiftUI
 import AppKit
 
+final class ScanActivityTracker: @unchecked Sendable {
+    static let shared = ScanActivityTracker()
+    private let lock = NSLock()
+    private var activeCount = 0
+
+    var isActive: Bool { lock.withLock { activeCount > 0 } }
+
+    func update(from oldValue: Bool, to newValue: Bool) {
+        guard oldValue != newValue else { return }
+        lock.withLock { activeCount = max(0, activeCount + (newValue ? 1 : -1)) }
+    }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard ScanActivityTracker.shared.isActive else { return .terminateNow }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Stop scanning?")
+        alert.informativeText = String(localized: "A scan is still running. Stop it and quit SparkClean?")
+        alert.addButton(withTitle: String(localized: "Stop Scanning and Quit"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+    }
+}
+
 @main
 struct SparkCleanApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var showCustomAbout = false
     @State private var trashMonitor = TrashMonitor()
     @State private var updateChecker = UpdateChecker()
@@ -180,21 +209,31 @@ struct RootWindowView: View {
 }
 
 private struct WindowTransparencyConfigurator: NSViewRepresentable {
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        DispatchQueue.main.async { configure(view.window) }
+        DispatchQueue.main.async { configure(view.window, closeTarget: context.coordinator) }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { configure(nsView.window) }
+        DispatchQueue.main.async { configure(nsView.window, closeTarget: context.coordinator) }
     }
 
-    private func configure(_ window: NSWindow?) {
+    private func configure(_ window: NSWindow?, closeTarget: Coordinator) {
         window?.styleMask.insert(.fullSizeContentView)
         window?.titlebarAppearsTransparent = true
         window?.titleVisibility = .hidden
         window?.titlebarSeparatorStyle = .none
+        window?.standardWindowButton(.closeButton)?.target = closeTarget
+        window?.standardWindowButton(.closeButton)?.action = #selector(Coordinator.quitApplication(_:))
+    }
+
+    final class Coordinator: NSObject {
+        @objc func quitApplication(_ sender: NSButton) {
+            NSApp.terminate(sender)
+        }
     }
 }
 

@@ -57,7 +57,9 @@ struct DuplicateGroup: Identifiable {
 @Observable
 class DuplicateFinderManager {
     var duplicateGroups: [DuplicateGroup] = []
-    var isScanning = false
+    var isScanning = false {
+        didSet { ScanActivityTracker.shared.update(from: oldValue, to: isScanning) }
+    }
     var scanComplete = false
     var scanProgress: Double = 0
     var currentScanItem = ""
