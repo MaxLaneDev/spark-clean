@@ -724,7 +724,6 @@ struct UninstallerView: View {
     @Environment(\.layoutDirection) private var layoutDirection
     @State private var uninstaller = UninstallerManager()
     @State private var selectedApp: AppInfo? = nil
-    @State private var showUninstallAlert = false
     @State private var appToUninstall: AppInfo? = nil
     @State private var showExportSheet = false
     @State private var isUninstalling = false
@@ -816,11 +815,9 @@ struct UninstallerView: View {
                 welcomeSection
             }
         }
-        .sheet(isPresented: $showUninstallAlert) {
-            if let app = appToUninstall {
-                UninstallConfirmationSheet(app: app, useTrash: preferTrash) { trashOnly in
-                    performUninstall(app, trashOnly: trashOnly)
-                }
+        .sheet(item: $appToUninstall) { app in
+            UninstallConfirmationSheet(app: app, useTrash: preferTrash) { trashOnly in
+                performUninstall(app, trashOnly: trashOnly)
             }
         }
         .sheet(isPresented: $showExportSheet) {
@@ -1122,7 +1119,6 @@ struct UninstallerView: View {
                         appToUninstall = uninstaller.apps.first {
                             $0.id == app.id
                         } ?? app
-                        showUninstallAlert = true
                     } label: {
                         ToolbarActionLabel(
                             title: isUninstalling ? String(localized: "Uninstalling...") : String(localized: "Uninstall"),
