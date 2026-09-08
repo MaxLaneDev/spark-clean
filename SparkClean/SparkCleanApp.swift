@@ -150,6 +150,7 @@ struct RootWindowView: View {
         ContentView()
             .environment(trashMonitor)
             .frame(minWidth: 800, minHeight: 550)
+            .background(WindowTransparencyConfigurator())
             .sheet(isPresented: $showCustomAbout) {
                 CustomAboutView()
             }
@@ -175,6 +176,22 @@ struct RootWindowView: View {
             .sheet(isPresented: $showUpdateSheet) {
                 UpdateCheckSheet(updateChecker: updateChecker)
             }
+    }
+}
+
+private struct WindowTransparencyConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { configure(view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { configure(nsView.window) }
+    }
+
+    private func configure(_ window: NSWindow?) {
+        window?.titlebarAppearsTransparent = true
     }
 }
 

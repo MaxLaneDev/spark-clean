@@ -42,7 +42,10 @@ struct ContentView: View {
             sidebarContent
         }
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
-        .background(SidebarMaterialBackground())
+        .background {
+            SidebarMaterialBackground()
+                .ignoresSafeArea(.container, edges: .top)
+        }
         .accessibilityIdentifier("mainSidebar")
     }
 
