@@ -47,6 +47,10 @@ struct SidebarScrollBlurTests {
         #expect(SidebarScrollBlur.opacity(for: 100, bottomEdge: 100, macOSMajorVersion: 15) == 0)
     }
 
+    @Test func lastItemCanScrollPastTheBottomBlur() {
+        #expect(SidebarScrollBlur.bottomContentInset > SidebarScrollBlur.transitionDistance)
+    }
+
     @Test func macOS26KeepsNativeAppearance() {
         #expect(SidebarScrollBlur.radius(for: -40, macOSMajorVersion: 26) == 0)
         #expect(SidebarScrollBlur.opacity(for: 100, bottomEdge: 100, macOSMajorVersion: 26) == 1)

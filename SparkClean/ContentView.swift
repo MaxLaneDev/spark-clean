@@ -388,7 +388,7 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
-                .padding(.bottom, 8)
+                .padding(.bottom, SidebarScrollBlur.bottomContentInset)
             }
             .environment(
                 \.sidebarScrollBlurBottom,

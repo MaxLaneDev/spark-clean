@@ -525,6 +525,9 @@ struct SidebarScrollBlurModifier: ViewModifier {
 }
 
 enum SidebarScrollBlur {
+    nonisolated static let transitionDistance: CGFloat = 18
+    nonisolated static let bottomContentInset = transitionDistance + 8
+
     nonisolated static func radius(
         for minY: CGFloat,
         maxY: CGFloat = -.infinity,
@@ -533,7 +536,7 @@ enum SidebarScrollBlur {
     ) -> CGFloat {
         guard macOSMajorVersion < 26 else { return 0 }
         let top = max(0, -minY / 2)
-        let bottom = max(0, (maxY - (bottomEdge - 18)) / 2)
+        let bottom = max(0, (maxY - (bottomEdge - transitionDistance)) / 2)
         return min(10, max(top, bottom))
     }
 
@@ -543,7 +546,7 @@ enum SidebarScrollBlur {
         macOSMajorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
     ) -> Double {
         guard macOSMajorVersion < 26 else { return 1 }
-        return min(1, max(0, Double((bottomEdge - maxY) / 18)))
+        return min(1, max(0, Double((bottomEdge - maxY) / transitionDistance)))
     }
 }
 
