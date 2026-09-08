@@ -79,7 +79,7 @@ struct StorageInsightsView: View {
         let visibleItems = manager.items.filter {
             $0.size > 0 || !$0.accessible || $0.measurementIncomplete
         }
-        return ScrollView(.vertical, showsIndicators: false) {
+        return IndicatorlessScrollView {
             if visibleItems.isEmpty && !manager.isMeasuring {
                 VStack(spacing: 10) {
                     Image(systemName: "externaldrive.badge.checkmark")

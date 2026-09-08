@@ -851,7 +851,7 @@ struct DuplicateFinderView: View {
     // MARK: - Duplicate List
 
     private var duplicateListSection: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        IndicatorlessScrollView {
             LazyVStack(spacing: 6) {
                 ForEach(Array(manager.filteredGroups.enumerated()), id: \.element.id) { index, group in
                     DuplicateGroupRow(

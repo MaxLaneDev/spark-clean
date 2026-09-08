@@ -109,7 +109,7 @@ struct CategoryGroupDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(32)
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
+                IndicatorlessScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(groupCategories) { category in
                             CategoryRowView(
@@ -362,7 +362,7 @@ struct PathBreakdownView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
+                IndicatorlessScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(Array(category.breakdown.enumerated()), id: \.element.id) { idx, stat in
                             HStack(alignment: .center, spacing: 12) {

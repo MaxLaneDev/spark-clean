@@ -942,7 +942,7 @@ struct UninstallerView: View {
     // MARK: - App List
 
     private var appListSection: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        IndicatorlessScrollView {
             LazyVStack(spacing: 4) {
                 ForEach(uninstaller.filteredApps) { app in
                     AppRowView(
@@ -961,7 +961,7 @@ struct UninstallerView: View {
     // MARK: - App Detail
 
     private func appDetailSection(_ app: AppInfo) -> some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        IndicatorlessScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // App header
                 HStack(spacing: 16) {

@@ -42,24 +42,22 @@ struct ContentView: View {
             sidebarContent
         }
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
-        .background(.ultraThinMaterial)
+        .background(SidebarMaterialBackground())
         .overlay(alignment: .top) {
             sidebarTitlebarFade
-                .offset(y: -28)
-                .ignoresSafeArea(.container, edges: .top)
         }
         .accessibilityIdentifier("mainSidebar")
     }
 
     private var sidebarTitlebarFade: some View {
         Rectangle()
-            .fill(.ultraThinMaterial)
-            .frame(height: 34)
+            .fill(.thinMaterial)
+            .frame(height: 48)
             .mask(
                 LinearGradient(
                     stops: [
                         .init(color: .black, location: 0),
-                        .init(color: .black.opacity(0.9), location: 0.55),
+                        .init(color: .black, location: 0.55),
                         .init(color: .clear, location: 1),
                     ],
                     startPoint: .top,
@@ -307,7 +305,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebarContent: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        IndicatorlessScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 SidebarRow(
                     label: String(localized: "Dashboard"),
@@ -404,7 +402,9 @@ struct ContentView: View {
                     selectedSidebar = .storageInsights
                 }
             }
-            .padding(8)
+            .padding(.horizontal, 8)
+            .padding(.top, 32)
+            .padding(.bottom, 8)
         }
 
         // Scan progress
@@ -512,7 +512,7 @@ struct DashboardView: View {
 
             // Content
             if manager.scanComplete {
-                ScrollView(.vertical, showsIndicators: false) {
+                IndicatorlessScrollView {
                     VStack(spacing: 20) {
                         if let disk = manager.diskUsage {
                             DiskUsageCardView(disk: disk, reclaimable: manager.overallSize)
@@ -948,7 +948,7 @@ struct CleanConfirmationSheet: View {
             Divider()
 
             // Summary
-            ScrollView(.vertical, showsIndicators: false) {
+            IndicatorlessScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if !preferTrash {
                         HStack(alignment: .top, spacing: 10) {
@@ -1598,7 +1598,7 @@ struct WhatsNewView: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            ScrollView(.vertical, showsIndicators: false) {
+            IndicatorlessScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     ForEach(releases) { release in
                         VStack(alignment: .leading, spacing: 10) {
@@ -1643,7 +1643,7 @@ struct HelpView: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            ScrollView(.vertical, showsIndicators: false) {
+            IndicatorlessScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     helpSection(
                         String(localized: "Getting Started"),
@@ -1708,7 +1708,7 @@ struct PrivacyPolicyView: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            ScrollView(.vertical, showsIndicators: false) {
+            IndicatorlessScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Last updated: July 2026")
                         .font(.caption)

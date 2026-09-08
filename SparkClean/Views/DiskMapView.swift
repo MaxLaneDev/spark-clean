@@ -18,7 +18,7 @@ struct DiskMapView: View {
             Divider()
 
             if let snapshot = manager.snapshot {
-                ScrollView(.vertical, showsIndicators: false) {
+                IndicatorlessScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         if manager.isScanning {
                             progressBanner

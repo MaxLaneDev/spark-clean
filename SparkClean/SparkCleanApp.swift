@@ -417,7 +417,7 @@ struct TrashLeftoverSheet: View {
                 Text("**\(detected.appName)** was moved to Trash but left **\(detected.formattedSize)** of data behind:")
                     .font(.body)
 
-                ScrollView(.vertical, showsIndicators: false) {
+                IndicatorlessScrollView {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(visibleLeftovers, id: \.path) { item in
                             HStack {

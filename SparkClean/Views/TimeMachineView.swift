@@ -106,7 +106,7 @@ struct TimeMachineView: View {
     }
 
     private var list: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        IndicatorlessScrollView {
             LazyVStack(spacing: 6) {
                 ForEach(manager.snapshots) { snap in
                     HStack(spacing: 12) {

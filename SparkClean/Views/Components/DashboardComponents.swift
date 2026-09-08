@@ -5,7 +5,67 @@
 //  Created by George Khananaev on 3/6/26.
 //
 
+import AppKit
 import SwiftUI
+
+struct IndicatorlessScrollView<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            content
+        }
+            .background(ScrollIndicatorHider())
+    }
+}
+
+private struct ScrollIndicatorHider: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        ScrollIndicatorHiderView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? ScrollIndicatorHiderView)?.hideIndicators()
+    }
+}
+
+private final class ScrollIndicatorHiderView: NSView {
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        hideIndicators()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        hideIndicators()
+    }
+
+    func hideIndicators() {
+        DispatchQueue.main.async { [weak self] in
+            guard let scrollView = self?.enclosingScrollView else { return }
+            scrollView.hasVerticalScroller = false
+            scrollView.hasHorizontalScroller = false
+            scrollView.verticalScroller?.isHidden = true
+            scrollView.horizontalScroller?.isHidden = true
+        }
+    }
+}
+
+struct SidebarMaterialBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
 
 struct AdaptiveHeader<Leading: View, Actions: View>: View {
     let leading: Leading
