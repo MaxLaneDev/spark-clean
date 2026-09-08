@@ -328,7 +328,7 @@ struct MaintenanceView: View {
             Divider()
 
             // Task List
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 1) {
                     // No-admin section
                     Section {

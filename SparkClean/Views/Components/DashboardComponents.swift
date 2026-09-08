@@ -420,13 +420,13 @@ struct SidebarRow: View {
                 }
             }
             .contentShape(Rectangle())
-            .padding(.vertical, 3)
+            .padding(.vertical, 5)
         }
+        .frame(maxWidth: .infinity)
         .buttonStyle(.plain)
-        .listRowBackground(
+        .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
-                .padding(.horizontal, 4)
                 .animation(.easeInOut(duration: 0.15), value: isSelected)
         )
     }

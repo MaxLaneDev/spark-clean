@@ -341,7 +341,7 @@ struct StartupManagerView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 1) {
                         ForEach(Array(filteredItems.enumerated()), id: \.element.id) { _, item in
                             if let index = manager.items.firstIndex(where: { $0.id == item.id }) {

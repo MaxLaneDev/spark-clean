@@ -43,7 +43,30 @@ struct ContentView: View {
         }
         .frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
         .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            sidebarTitlebarFade
+                .offset(y: -28)
+                .ignoresSafeArea(.container, edges: .top)
+        }
         .accessibilityIdentifier("mainSidebar")
+    }
+
+    private var sidebarTitlebarFade: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .frame(height: 34)
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black.opacity(0.9), location: 0.55),
+                        .init(color: .clear, location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -115,7 +138,6 @@ struct ContentView: View {
                 detailPane
             }
         }
-        .scrollIndicators(.hidden)
         // Clean confirmation with safety breakdown
         .sheet(isPresented: $showCleanAlert) {
             CleanConfirmationSheet(manager: manager, isPresented: $showCleanAlert) {
@@ -285,8 +307,8 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebarContent: some View {
-        List {
-            Section {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 SidebarRow(
                     label: String(localized: "Dashboard"),
                     icon: "gauge.with.dots.needle.33percent",
@@ -295,9 +317,9 @@ struct ContentView: View {
                 ) {
                     selectedSidebar = .dashboard
                 }
-            }
 
-            Section("Categories") {
+                sidebarHeading("Categories")
+
                 ForEach(CategoryGroup.allCases) { group in
                     let cats = manager.categoriesForGroup(group)
                     let hasResults = !cats.isEmpty
@@ -316,9 +338,9 @@ struct ContentView: View {
                     }
                     .opacity(hasResults ? 1.0 : 0.5)
                 }
-            }
 
-            Section("Tools") {
+                sidebarHeading("Tools")
+
                 SidebarRow(
                     label: String(localized: "Uninstaller"),
                     icon: "trash.square",
@@ -382,25 +404,7 @@ struct ContentView: View {
                     selectedSidebar = .storageInsights
                 }
             }
-        }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .frame(height: 34)
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black.opacity(0.9), location: 0.55),
-                            .init(color: .clear, location: 1),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .allowsHitTesting(false)
+            .padding(8)
         }
 
         // Scan progress
@@ -475,6 +479,16 @@ struct ContentView: View {
             .padding(.bottom, 8)
         }
     }
+
+    private func sidebarHeading(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+    }
 }
 
 // MARK: - Dashboard View
@@ -498,7 +512,7 @@ struct DashboardView: View {
 
             // Content
             if manager.scanComplete {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 20) {
                         if let disk = manager.diskUsage {
                             DiskUsageCardView(disk: disk, reclaimable: manager.overallSize)
@@ -934,7 +948,7 @@ struct CleanConfirmationSheet: View {
             Divider()
 
             // Summary
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     if !preferTrash {
                         HStack(alignment: .top, spacing: 10) {
@@ -1584,7 +1598,7 @@ struct WhatsNewView: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
                     ForEach(releases) { release in
                         VStack(alignment: .leading, spacing: 10) {
@@ -1629,7 +1643,7 @@ struct HelpView: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
                     helpSection(
                         String(localized: "Getting Started"),
@@ -1694,7 +1708,7 @@ struct PrivacyPolicyView: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Last updated: July 2026")
                         .font(.caption)
